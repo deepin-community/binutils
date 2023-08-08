@@ -1,6 +1,6 @@
 /* tc-loongarch.c -- Assemble for the LoongArch ISA
 
-   Copyright (C) 2021-2022 Free Software Foundation, Inc.
+   Copyright (C) 2021-2023 Free Software Foundation, Inc.
    Contributed by Loongson Ltd.
 
    This file is part of GAS.
@@ -25,6 +25,7 @@
 #include "elf/loongarch.h"
 #include "opcode/loongarch.h"
 #include "obj-elf.h"
+#include "bfd/elfxx-loongarch.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -122,7 +123,6 @@ enum options
 struct option md_longopts[] =
 {
   { "mabi", required_argument, NULL, OPTION_ABI },
-  { "mfloat-abi", required_argument, NULL, OPTION_FLOAT_ABI },
 
   { "mfpu", required_argument, NULL, OPTION_FLOAT_ISA },
 
@@ -139,31 +139,32 @@ int
 md_parse_option (int c, const char *arg)
 {
   int ret = 1;
+  char lp64[256] = "";
+  char ilp32[256] = "";
+  unsigned char *suf = (unsigned char *)arg;
+
+  lp64['s'] = lp64['S'] = EF_LOONGARCH_ABI_SOFT_FLOAT;
+  lp64['f'] = lp64['F'] = EF_LOONGARCH_ABI_SINGLE_FLOAT;
+  lp64['d'] = lp64['D'] = EF_LOONGARCH_ABI_DOUBLE_FLOAT;
+
+  ilp32['s'] = ilp32['S'] = EF_LOONGARCH_ABI_SOFT_FLOAT;
+  ilp32['f'] = ilp32['F'] = EF_LOONGARCH_ABI_SINGLE_FLOAT;
+  ilp32['d'] = ilp32['D'] = EF_LOONGARCH_ABI_DOUBLE_FLOAT;
+
   switch (c)
     {
     case OPTION_ABI:
-      if (strcasecmp (arg, "lp64") == 0)
+      if (strncasecmp (arg, "lp64", 4) == 0 && lp64[suf[4]] != 0)
 	{
-	  LARCH_opts.ase_abi |= EF_LOONGARCH_ABI_LP64;
 	  LARCH_opts.ase_ilp32 = 1;
 	  LARCH_opts.ase_lp64 = 1;
+	  LARCH_opts.ase_abi = lp64[suf[4]];
 	}
-      else if (strcasecmp (arg, "ilp32") == 0)
+      else if (strncasecmp (arg, "ilp32", 5) == 0 && ilp32[suf[5]] != 0)
 	{
-	  LARCH_opts.ase_abi |= EF_LOONGARCH_ABI_ILP32;
+	  LARCH_opts.ase_abi = ilp32[suf[5]];
 	  LARCH_opts.ase_ilp32 = 1;
 	}
-      else
-	ret = 0;
-      break;
-
-    case OPTION_FLOAT_ABI:
-      if (strcasecmp (arg, "soft") == 0)
-	LARCH_opts.ase_abi |= EF_LOONGARCH_FLOAT_ABI_SOFT;
-      else if (strcasecmp (arg, "single") == 0)
-	LARCH_opts.ase_abi |= EF_LOONGARCH_FLOAT_ABI_SINGLE;
-      else if (strcasecmp (arg, "double") == 0)
-	LARCH_opts.ase_abi |= EF_LOONGARCH_FLOAT_ABI_DOUBLE;
       else
 	ret = 0;
       break;
@@ -214,31 +215,25 @@ static struct htab *x_htab = NULL;
 void
 loongarch_after_parse_args ()
 {
-  /* Set default ABI/ISA LP64.  */
-  if (!EF_LOONGARCH_IS_LP64(LARCH_opts.ase_abi)
-      && !EF_LOONGARCH_IS_ILP32(LARCH_opts.ase_abi))
+  /* Set default ABI/ISA LP64D.  */
+  if (!LARCH_opts.ase_ilp32)
     {
       if (strcmp (default_arch, "loongarch64") == 0)
 	{
-	  LARCH_opts.ase_abi |= EF_LOONGARCH_ABI_LP64;
+	  LARCH_opts.ase_abi = EF_LOONGARCH_ABI_DOUBLE_FLOAT;
 	  LARCH_opts.ase_ilp32 = 1;
 	  LARCH_opts.ase_lp64 = 1;
 	}
       else if (strcmp (default_arch, "loongarch32") == 0)
 	{
-	  LARCH_opts.ase_abi |= EF_LOONGARCH_ABI_ILP32;
+	  LARCH_opts.ase_abi = EF_LOONGARCH_ABI_DOUBLE_FLOAT;
 	  LARCH_opts.ase_ilp32 = 1;
 	}
       else
 	as_bad ("unknown default architecture `%s'", default_arch);
     }
 
-  /* Set default ABI double-float.  */
-  if (!EF_LOONGARCH_IS_SOFT_FLOAT(LARCH_opts.ase_abi)
-      && !EF_LOONGARCH_IS_SINGLE_FLOAT(LARCH_opts.ase_abi)
-      && !EF_LOONGARCH_IS_DOUBLE_FLOAT(LARCH_opts.ase_abi))
-    LARCH_opts.ase_abi |= EF_LOONGARCH_FLOAT_ABI_DOUBLE;
-
+  LARCH_opts.ase_abi |= EF_LOONGARCH_OBJABI_V1;
   /* Set default ISA double-float.  */
   if (!LARCH_opts.ase_nf
       && !LARCH_opts.ase_sf
@@ -359,19 +354,13 @@ md_begin ()
   assert (8 <= sizeof (offsetT));
 }
 
-static const expressionS const_0 = { .X_op = O_constant, .X_add_number = 0 };
-
-static const char *
-my_getExpression (expressionS *ep, const char *str)
+unsigned long
+loongarch_mach (void)
 {
-  char *save_in, *ret;
-  save_in = input_line_pointer;
-  input_line_pointer = (char *) str;
-  expression (ep);
-  ret = input_line_pointer;
-  input_line_pointer = save_in;
-  return ret;
+  return LARCH_opts.ase_lp64 ? bfd_mach_loongarch64 : bfd_mach_loongarch32;
 }
+
+static const expressionS const_0 = { .X_op = O_constant, .X_add_number = 0 };
 
 static void
 s_loongarch_align (int arg)
@@ -478,11 +467,6 @@ get_internal_label (expressionS *label_expr, unsigned long label,
     symbol_find_or_make (loongarch_internal_label_name (label, augend));
   label_expr->X_add_number = 0;
 }
-
-extern int loongarch_parse_expr (const char *expr,
-				 struct reloc_info *reloc_stack_top,
-				 size_t max_reloc_num, size_t *reloc_num,
-				 offsetT *imm_if_no_reloc);
 
 static int
 is_internal_label (const char *c_str)
@@ -598,24 +582,6 @@ loongarch_args_parser_can_match_arg_helper (char esc_ch1, char esc_ch2,
       if (!ip->match_now)
 	break;
 
-      if (esc_ch1 == 's')
-	switch (esc_ch2)
-	  {
-	  case 'c':
-	    ip->match_now = reloc_num == 0;
-	    break;
-	  }
-      else
-	switch (esc_ch2)
-	  {
-	  case 'c':
-	    ip->match_now = reloc_num == 0 && 0 <= imm;
-	    break;
-	  }
-
-      if (!ip->match_now)
-	break;
-
       ret = imm;
       if (reloc_num)
 	{
@@ -651,6 +617,15 @@ loongarch_args_parser_can_match_arg_helper (char esc_ch1, char esc_ch2,
 	    as_fatal (
 		      _("not support reloc bit-field\nfmt: %c%c %s\nargs: %s"),
 		      esc_ch1, esc_ch2, bit_field, arg);
+	  if (ip->reloc_info[0].type >= BFD_RELOC_LARCH_B16
+	      && ip->reloc_info[0].type < BFD_RELOC_LARCH_RELAX)
+	    {
+	      /* As we compact stack-relocs, it is no need for pop operation.
+		 But break out until here in order to check the imm field.
+		 May be reloc_num > 1 if implement relax?  */
+	      ip->reloc_num += reloc_num;
+	      break;
+	    }
 	  reloc_num++;
 	  ip->reloc_num += reloc_num;
 	  ip->reloc_info[ip->reloc_num - 1].type = reloc_type;
@@ -766,7 +741,12 @@ get_loongarch_opcode (struct loongarch_cl_insn *insn)
 	{
 	  ase->name_hash_entry = str_htab_create ();
 	  for (it = ase->opcodes; it->name; it++)
-	    str_hash_insert (ase->name_hash_entry, it->name, (void *) it, 0);
+	    {
+	      if ((!it->include || (it->include && *it->include))
+		  && (!it->exclude || (it->exclude && !(*it->exclude))))
+		str_hash_insert (ase->name_hash_entry, it->name,
+				 (void *) it, 0);
+	    }
 	}
 
       if ((it = str_hash_find (ase->name_hash_entry, insn->name)) == NULL)
@@ -799,10 +779,11 @@ static int
 check_this_insn_before_appending (struct loongarch_cl_insn *ip)
 {
   int ret = 0;
-  if (strcmp (ip->name, "la.abs") == 0)
+
+  if (strncmp (ip->name, "la.abs", 6) == 0)
     {
       ip->reloc_info[ip->reloc_num].type = BFD_RELOC_LARCH_MARK_LA;
-      my_getExpression (&ip->reloc_info[ip->reloc_num].value, ip->arg_strs[1]);
+      ip->reloc_info[ip->reloc_num].value = const_0;
       ip->reloc_num++;
     }
   else if (ip->insn->mask == 0xffff8000
@@ -875,6 +856,9 @@ append_fixp_and_insn (struct loongarch_cl_insn *ip)
   bfd_reloc_code_real_type reloc_type;
   struct reloc_info *reloc_info = ip->reloc_info;
   size_t i;
+
+  dwarf2_emit_insn (0);
+
   for (i = 0; i < ip->reloc_num; i++)
     {
       reloc_type = reloc_info[i].type;
@@ -891,7 +875,6 @@ append_fixp_and_insn (struct loongarch_cl_insn *ip)
     as_fatal (_("Internal error: not support relax now"));
   else
     append_fixed_insn (ip);
-  dwarf2_emit_insn (0);
 }
 
 /* Ask helper for returning a malloced c_str or NULL.  */
@@ -974,8 +957,10 @@ assember_macro_helper (const char *const args[], void *context_ptr)
 	}
       while (0);
 
-      ret = loongarch_expand_macro (insns_buf, arg_strs, NULL, NULL);
+      ret = loongarch_expand_macro (insns_buf, arg_strs, NULL, NULL,
+				    sizeof (args_buf));
     }
+
   return ret;
 }
 
@@ -986,6 +971,7 @@ static void
 loongarch_assemble_INSNs (char *str)
 {
   char *rest;
+  size_t len_str = strlen(str);
 
   for (rest = str; *rest != ';' && *rest != '\0'; rest++);
   if (*rest == ';')
@@ -1031,7 +1017,7 @@ loongarch_assemble_INSNs (char *str)
 	  char *c_str = loongarch_expand_macro (the_one.insn->macro,
 						the_one.arg_strs,
 						assember_macro_helper,
-						&the_one);
+						&the_one, len_str);
 	  loongarch_assemble_INSNs (c_str);
 	  free (c_str);
 	}
@@ -1068,13 +1054,30 @@ md_pcrel_from (fixS *fixP ATTRIBUTE_UNUSED)
   return 0;
 }
 
+static void fix_reloc_insn (fixS *fixP, bfd_vma reloc_val, char *buf)
+{
+  reloc_howto_type *howto;
+  insn_t insn;
+  howto = bfd_reloc_type_lookup (stdoutput, fixP->fx_r_type);
+
+  insn = bfd_getl32 (buf);
+
+  if (!loongarch_adjust_reloc_bitsfield(howto, &reloc_val))
+    as_warn_where (fixP->fx_file, fixP->fx_line, "Reloc overflow");
+
+  insn = (insn & (insn_t)howto->src_mask)
+    | ((insn & (~(insn_t)howto->dst_mask)) | reloc_val);
+
+  bfd_putl32 (insn, buf);
+}
+
 void
 md_apply_fix (fixS *fixP, valueT *valP, segT seg ATTRIBUTE_UNUSED)
 {
   static int64_t stack_top;
   static int last_reloc_is_sop_push_pcrel_1 = 0;
   int last_reloc_is_sop_push_pcrel = last_reloc_is_sop_push_pcrel_1;
-  insn_t insn;
+  segT sub_segment;
   last_reloc_is_sop_push_pcrel_1 = 0;
 
   char *buf = fixP->fx_frag->fr_literal + fixP->fx_where;
@@ -1083,143 +1086,73 @@ md_apply_fix (fixS *fixP, valueT *valP, segT seg ATTRIBUTE_UNUSED)
     case BFD_RELOC_LARCH_SOP_PUSH_TLS_TPREL:
     case BFD_RELOC_LARCH_SOP_PUSH_TLS_GD:
     case BFD_RELOC_LARCH_SOP_PUSH_TLS_GOT:
-      if (fixP->fx_addsy)
-	S_SET_THREAD_LOCAL (fixP->fx_addsy);
-      else
-	as_bad_where (fixP->fx_file, fixP->fx_line,
-		      _("Relocation against a constant"));
-      break;
-    case BFD_RELOC_LARCH_SOP_PUSH_PCREL:
-    case BFD_RELOC_LARCH_SOP_PUSH_PLT_PCREL:
+    case BFD_RELOC_LARCH_TLS_LE_HI20:
+    case BFD_RELOC_LARCH_TLS_LE_LO12:
+    case BFD_RELOC_LARCH_TLS_LE64_LO20:
+    case BFD_RELOC_LARCH_TLS_LE64_HI12:
+    case BFD_RELOC_LARCH_TLS_IE_PC_HI20:
+    case BFD_RELOC_LARCH_TLS_IE_PC_LO12:
+    case BFD_RELOC_LARCH_TLS_IE64_PC_LO20:
+    case BFD_RELOC_LARCH_TLS_IE64_PC_HI12:
+    case BFD_RELOC_LARCH_TLS_IE_HI20:
+    case BFD_RELOC_LARCH_TLS_IE_LO12:
+    case BFD_RELOC_LARCH_TLS_IE64_LO20:
+    case BFD_RELOC_LARCH_TLS_IE64_HI12:
+    case BFD_RELOC_LARCH_TLS_LD_PC_HI20:
+    case BFD_RELOC_LARCH_TLS_LD_HI20:
+    case BFD_RELOC_LARCH_TLS_GD_PC_HI20:
+    case BFD_RELOC_LARCH_TLS_GD_HI20:
+      /* Add tls lo (got_lo reloc type).  */
       if (fixP->fx_addsy == NULL)
 	as_bad_where (fixP->fx_file, fixP->fx_line,
 		      _("Relocation against a constant"));
-      if (fixP->fx_r_type == BFD_RELOC_LARCH_SOP_PUSH_PCREL)
-	{
-	  last_reloc_is_sop_push_pcrel_1 = 1;
-	  if (S_GET_SEGMENT (fixP->fx_addsy) == seg)
-	    stack_top = (S_GET_VALUE (fixP->fx_addsy) + fixP->fx_offset
-			 - (fixP->fx_where + fixP->fx_frag->fr_address));
-	  else
-	    stack_top = 0;
-	}
+      S_SET_THREAD_LOCAL (fixP->fx_addsy);
+      break;
+
+    case BFD_RELOC_LARCH_SOP_PUSH_PCREL:
+      if (fixP->fx_addsy == NULL)
+	as_bad_where (fixP->fx_file, fixP->fx_line,
+		      _("Relocation against a constant"));
+
+      last_reloc_is_sop_push_pcrel_1 = 1;
+      if (S_GET_SEGMENT (fixP->fx_addsy) == seg)
+	stack_top = (S_GET_VALUE (fixP->fx_addsy) + fixP->fx_offset
+		     - (fixP->fx_where + fixP->fx_frag->fr_address));
+      else
+	stack_top = 0;
       break;
 
     case BFD_RELOC_LARCH_SOP_POP_32_S_10_5:
-      if (!last_reloc_is_sop_push_pcrel)
-	break;
-      if ((stack_top & ~(uint64_t) 0xf) != 0x0
-	  && (stack_top & ~(uint64_t) 0xf) != ~(uint64_t) 0xf)
-	as_warn_where (fixP->fx_file, fixP->fx_line, "Reloc overflow");
-      insn = bfd_getl32 (buf);
-      insn = (insn & (~(uint32_t) 0x7c00)) | ((stack_top & 0x1f) << 10);
-      bfd_putl32 (insn, buf);
-      break;
-
-    case BFD_RELOC_LARCH_SOP_POP_32_U_10_12:
-      if (!last_reloc_is_sop_push_pcrel)
-	break;
-      if (stack_top & ~(uint64_t) 0xfff)
-	as_warn_where (fixP->fx_file, fixP->fx_line, "Reloc overflow");
-      insn = bfd_getl32 (buf);
-      insn = (insn & (~(uint32_t) 0x3ffc00)) | ((stack_top & 0xfff) << 10);
-      bfd_putl32 (insn, buf);
-      break;
-
     case BFD_RELOC_LARCH_SOP_POP_32_S_10_12:
-      if (!last_reloc_is_sop_push_pcrel)
-	break;
-      if ((stack_top & ~(uint64_t) 0x7ff) != 0x0
-	  && (stack_top & ~(uint64_t) 0x7ff) != ~(uint64_t) 0x7ff)
-	as_warn_where (fixP->fx_file, fixP->fx_line, "Reloc overflow");
-      insn = bfd_getl32 (buf);
-      insn = (insn & (~(uint32_t) 0x3ffc00)) | ((stack_top & 0xfff) << 10);
-      bfd_putl32 (insn, buf);
-      break;
-
+    case BFD_RELOC_LARCH_SOP_POP_32_U_10_12:
     case BFD_RELOC_LARCH_SOP_POP_32_S_10_16:
-      if (!last_reloc_is_sop_push_pcrel)
-	break;
-      if ((stack_top & ~(uint64_t) 0x7fff) != 0x0
-	  && (stack_top & ~(uint64_t) 0x7fff) != ~(uint64_t) 0x7fff)
-	as_warn_where (fixP->fx_file, fixP->fx_line, "Reloc overflow");
-      insn = bfd_getl32 (buf);
-      insn = (insn & 0xfc0003ff) | ((stack_top & 0xffff) << 10);
-      bfd_putl32 (insn, buf);
-      break;
-
     case BFD_RELOC_LARCH_SOP_POP_32_S_10_16_S2:
-      if (!last_reloc_is_sop_push_pcrel)
-	break;
-      if ((stack_top & 0x3) != 0)
-	as_warn_where (fixP->fx_file, fixP->fx_line, "Reloc overflow");
-      stack_top >>= 2;
-      if ((stack_top & ~(uint64_t) 0x7fff) != 0x0
-	  && (stack_top & ~(uint64_t) 0x7fff) != ~(uint64_t) 0x7fff)
-	as_warn_where (fixP->fx_file, fixP->fx_line, "Reloc overflow");
-      insn = bfd_getl32 (buf);
-      insn = (insn & 0xfc0003ff) | ((stack_top & 0xffff) << 10);
-      bfd_putl32 (insn, buf);
-      break;
-
-    case BFD_RELOC_LARCH_SOP_POP_32_S_0_5_10_16_S2:
-      if (!last_reloc_is_sop_push_pcrel)
-	break;
-      if ((stack_top & 0x3) != 0)
-	break;
-      stack_top >>= 2;
-      if ((stack_top & ~(uint64_t) 0xfffff) != 0x0
-	  && (stack_top & ~(uint64_t) 0xfffff) != ~(uint64_t) 0xfffff)
-	as_warn_where (fixP->fx_file, fixP->fx_line, "Reloc overflow");
-      insn = bfd_getl32 (buf);
-      insn = ((insn & 0xfc0003e0)
-	      | ((stack_top & 0xffff) << 10)
-	      | ((stack_top & 0x1f0000) >> 16));
-      bfd_putl32 (insn, buf);
-      break;
-
     case BFD_RELOC_LARCH_SOP_POP_32_S_5_20:
-      if (!last_reloc_is_sop_push_pcrel)
-	break;
-      if ((stack_top & ~(uint64_t) 0x7ffff) != 0x0
-	  && (stack_top & ~(uint64_t) 0x7ffff) != ~(uint64_t) 0x7ffff)
-	as_warn_where (fixP->fx_file, fixP->fx_line, "Reloc overflow");
-      insn = bfd_getl32 (buf);
-      insn = (insn & (~(uint32_t) 0x1ffffe0)) | ((stack_top & 0xfffff) << 5);
-      bfd_putl32 (insn, buf);
-      break;
-
+    case BFD_RELOC_LARCH_SOP_POP_32_U:
+    case BFD_RELOC_LARCH_SOP_POP_32_S_0_5_10_16_S2:
     case BFD_RELOC_LARCH_SOP_POP_32_S_0_10_10_16_S2:
       if (!last_reloc_is_sop_push_pcrel)
 	break;
-      if ((stack_top & 0x3) != 0)
-	as_warn_where (fixP->fx_file, fixP->fx_line, "Reloc overflow");
-      stack_top >>= 2;
-      if ((stack_top & ~(uint64_t) 0x1ffffff) != 0x0
-	  && (stack_top & ~(uint64_t) 0x1ffffff) != ~(uint64_t) 0x1ffffff)
-	as_warn_where (fixP->fx_file, fixP->fx_line, "Reloc overflow");
-      insn = bfd_getl32 (buf);
-      insn = ((insn & 0xfc000000)
-	      | ((stack_top & 0xffff) << 10)
-	      | ((stack_top & 0x3ff0000) >> 16));
-      bfd_putl32 (insn, buf);
-      break;
 
-    case BFD_RELOC_LARCH_SOP_POP_32_U:
-      if (!last_reloc_is_sop_push_pcrel)
-	break;
-      if (stack_top & ~(uint64_t) 0xffffffff)
-	as_warn_where (fixP->fx_file, fixP->fx_line, "Reloc overflow");
-      bfd_putl32 (stack_top, buf);
+      fix_reloc_insn (fixP, (bfd_vma)stack_top, buf);
       break;
 
     case BFD_RELOC_64:
     case BFD_RELOC_32:
+      if (fixP->fx_r_type == BFD_RELOC_32
+	  && fixP->fx_addsy && fixP->fx_subsy
+	  && (sub_segment = S_GET_SEGMENT (fixP->fx_subsy))
+	  && strcmp (sub_segment->name, ".eh_frame") == 0
+	  && S_GET_VALUE (fixP->fx_subsy)
+	  == fixP->fx_frag->fr_address + fixP->fx_where)
+	{
+	  fixP->fx_r_type = BFD_RELOC_LARCH_32_PCREL;
+	  fixP->fx_subsy = NULL;
+	  break;
+	}
+
       if (fixP->fx_subsy)
 	{
-	case BFD_RELOC_24:
-	case BFD_RELOC_16:
-	case BFD_RELOC_8:
 	  fixP->fx_next = xmemdup (fixP, sizeof (*fixP), sizeof (*fixP));
 	  fixP->fx_next->fx_addsy = fixP->fx_subsy;
 	  fixP->fx_next->fx_subsy = NULL;
@@ -1236,30 +1169,76 @@ md_apply_fix (fixS *fixP, valueT *valP, segT seg ATTRIBUTE_UNUSED)
 	      fixP->fx_r_type = BFD_RELOC_LARCH_ADD32;
 	      fixP->fx_next->fx_r_type = BFD_RELOC_LARCH_SUB32;
 	      break;
-	    case BFD_RELOC_24:
-	      fixP->fx_r_type = BFD_RELOC_LARCH_ADD24;
-	      fixP->fx_next->fx_r_type = BFD_RELOC_LARCH_SUB24;
-	      break;
-	    case BFD_RELOC_16:
-	      fixP->fx_r_type = BFD_RELOC_LARCH_ADD16;
-	      fixP->fx_next->fx_r_type = BFD_RELOC_LARCH_SUB16;
-	      break;
-	    case BFD_RELOC_8:
-	      fixP->fx_r_type = BFD_RELOC_LARCH_ADD8;
-	      fixP->fx_next->fx_r_type = BFD_RELOC_LARCH_SUB8;
-	      break;
 	    default:
 	      break;
 	    }
+
 	  md_number_to_chars (buf, 0, fixP->fx_size);
-	  if (fixP->fx_next->fx_addsy == NULL)
-	    fixP->fx_next->fx_done = 1;
 	}
+
       if (fixP->fx_addsy == NULL)
 	{
 	  fixP->fx_done = 1;
 	  md_number_to_chars (buf, *valP, fixP->fx_size);
 	}
+      break;
+
+    case BFD_RELOC_24:
+    case BFD_RELOC_16:
+    case BFD_RELOC_8:
+      fixP->fx_next = xmemdup (fixP, sizeof (*fixP), sizeof (*fixP));
+      fixP->fx_next->fx_addsy = fixP->fx_subsy;
+      fixP->fx_next->fx_subsy = NULL;
+      fixP->fx_next->fx_offset = 0;
+      fixP->fx_subsy = NULL;
+
+      switch (fixP->fx_r_type)
+	{
+	case BFD_RELOC_24:
+	  fixP->fx_r_type = BFD_RELOC_LARCH_ADD24;
+	  fixP->fx_next->fx_r_type = BFD_RELOC_LARCH_SUB24;
+	  break;
+	case BFD_RELOC_16:
+	  fixP->fx_r_type = BFD_RELOC_LARCH_ADD16;
+	  fixP->fx_next->fx_r_type = BFD_RELOC_LARCH_SUB16;
+	  break;
+	case BFD_RELOC_8:
+	  fixP->fx_r_type = BFD_RELOC_LARCH_ADD8;
+	  fixP->fx_next->fx_r_type = BFD_RELOC_LARCH_SUB8;
+	  break;
+	default:
+	  break;
+	}
+
+      md_number_to_chars (buf, 0, fixP->fx_size);
+
+      if (fixP->fx_next->fx_addsy == NULL)
+	fixP->fx_next->fx_done = 1;
+
+      if (fixP->fx_addsy == NULL)
+	{
+	  fixP->fx_done = 1;
+	  md_number_to_chars (buf, *valP, fixP->fx_size);
+	}
+      break;
+
+    case BFD_RELOC_LARCH_B16:
+    case BFD_RELOC_LARCH_B21:
+    case BFD_RELOC_LARCH_B26:
+      if (fixP->fx_addsy == NULL)
+	{
+	  as_bad_where (fixP->fx_file, fixP->fx_line,
+			_ ("Relocation against a constant."));
+	}
+      if (S_GET_SEGMENT (fixP->fx_addsy) == seg
+	  && !S_FORCE_RELOC (fixP->fx_addsy, 1))
+	{
+	  int64_t sym_addend = S_GET_VALUE (fixP->fx_addsy) + fixP->fx_offset;
+	  int64_t pc = fixP->fx_where + fixP->fx_frag->fr_address;
+	  fix_reloc_insn (fixP, sym_addend - pc, buf);
+	  fixP->fx_done = 1;
+	}
+
       break;
 
     default:
@@ -1280,6 +1259,18 @@ md_estimate_size_before_relax (fragS *fragp ATTRIBUTE_UNUSED,
 			       asection *segtype ATTRIBUTE_UNUSED)
 {
   return 0;
+}
+
+int
+loongarch_fix_adjustable (fixS *fix)
+{
+  /* Prevent all adjustments to global symbols.  */
+  if (S_IS_EXTERNAL (fix->fx_addsy)
+      || S_IS_WEAK (fix->fx_addsy)
+      || S_FORCE_RELOC (fix->fx_addsy, true))
+    return 0;
+
+  return 1;
 }
 
 /* Translate internal representation of relocation info to BFD target
@@ -1319,12 +1310,6 @@ void
 loongarch_cfi_frame_initial_instructions (void)
 {
   cfi_add_CFA_def_cfa_register (3 /* $sp */);
-}
-
-int
-loongarch_dwarf2_addr_size (void)
-{
-  return LARCH_opts.ase_lp64 ? 8 : 4;
 }
 
 void
@@ -1378,5 +1363,5 @@ loongarch_handle_align (fragS *fragp)
 void
 loongarch_elf_final_processing (void)
 {
-  elf_elfheader (stdoutput)->e_flags |= LARCH_opts.ase_abi;
+  elf_elfheader (stdoutput)->e_flags = LARCH_opts.ase_abi;
 }

@@ -15,7 +15,7 @@
 @SET_MAKE@
 
 #
-#   Copyright (C) 2019-2022 Free Software Foundation, Inc.
+#   Copyright (C) 2019-2023 Free Software Foundation, Inc.
 #
 # This file is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@
 #
 
 #
-#   Copyright (C) 2019-2022 Free Software Foundation, Inc.
+#   Copyright (C) 2019-2023 Free Software Foundation, Inc.
 #
 # This file is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -502,7 +502,6 @@ pdfdir = @pdfdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
-runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
@@ -579,7 +578,6 @@ RUNTESTFLAGS =
 # development.sh is used to determine -Werror default.
 @TCL_TRY_TRUE@CONFIG_STATUS_DEPENDENCIES = $(BFDDIR)/development.sh
 @TCL_TRY_TRUE@EXTRA_DEJAGNU_SITE_CONFIG = development.exp
-@BUILD_INFO_TRUE@libctf_TEXINFOS = $(info_TEXINFOS)
 @BUILD_INFO_TRUE@AM_MAKEINFOFLAGS = --no-split
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am

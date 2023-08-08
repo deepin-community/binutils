@@ -1,5 +1,5 @@
 /* RISC-V ELF specific backend routines.
-   Copyright (C) 2011-2022 Free Software Foundation, Inc.
+   Copyright (C) 2011-2023 Free Software Foundation, Inc.
 
    Contributed by Andrew Waterman (andrew@sifive.com).
    Based on MIPS target.
@@ -51,6 +51,7 @@ typedef struct
 {
   riscv_subset_t *head;
   riscv_subset_t *tail;
+  const char *arch_str;
 } riscv_subset_list_t;
 
 extern void
@@ -103,6 +104,9 @@ riscv_subset_supports (riscv_parse_subset_t *, const char *);
 
 extern bool
 riscv_multi_subset_supports (riscv_parse_subset_t *, enum riscv_insn_class);
+
+extern const char *
+riscv_multi_subset_supports_ext (riscv_parse_subset_t *, enum riscv_insn_class);
 
 extern void
 bfd_elf32_riscv_set_data_segment_info (struct bfd_link_info *, int *);

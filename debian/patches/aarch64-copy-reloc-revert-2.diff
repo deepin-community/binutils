@@ -1,0 +1,106 @@
+diff --git a/bfd/elfnn-aarch64.c b/bfd/elfnn-aarch64.c
+index 81311fc5a32..ca24a6b5678 100644
+--- a/bfd/elfnn-aarch64.c
++++ b/bfd/elfnn-aarch64.c
+@@ -2579,9 +2579,6 @@ struct elf_aarch64_link_hash_entry
+      this symbol.  */
+   unsigned int got_type;
+ 
+-  /* TRUE if symbol is defined as a protected symbol.  */
+-  unsigned int def_protected : 1;
+-
+   /* A pointer to the most recently used stub hash entry against this
+      symbol.  */
+   struct elf_aarch64_stub_hash_entry *stub_cache;
+@@ -2858,16 +2855,9 @@ elfNN_aarch64_copy_indirect_symbol (struct bfd_link_info *info,
+ static void
+ elfNN_aarch64_merge_symbol_attribute (struct elf_link_hash_entry *h,
+ 				      unsigned int st_other,
+-				      bool definition,
++				      bool definition ATTRIBUTE_UNUSED,
+ 				      bool dynamic ATTRIBUTE_UNUSED)
+ {
+-  if (definition)
+-    {
+-      struct elf_aarch64_link_hash_entry *eh
+-	  = (struct elf_aarch64_link_hash_entry *)h;
+-      eh->def_protected = ELF_ST_VISIBILITY (st_other) == STV_PROTECTED;
+-    }
+-
+   unsigned int isym_sto = st_other & ~ELF_ST_VISIBILITY (-1);
+   unsigned int h_sto = h->other & ~ELF_ST_VISIBILITY (-1);
+ 
+@@ -8711,22 +8701,6 @@ elfNN_aarch64_allocate_dynrelocs (struct elf_link_hash_entry *h, void *inf)
+   if (h->dyn_relocs == NULL)
+     return true;
+ 
+-  for (p = h->dyn_relocs; p != NULL; p = p->next)
+-    if (eh->def_protected)
+-      {
+-	/* Disallow copy relocations against protected symbol.  */
+-	asection *s = p->sec->output_section;
+-	if (s != NULL && (s->flags & SEC_READONLY) != 0)
+-	  {
+-	    info->callbacks->einfo
+-		/* xgettext:c-format */
+-		(_ ("%F%P: %pB: copy relocation against non-copyable "
+-		    "protected symbol `%s'\n"),
+-		 p->sec->owner, h->root.root.string);
+-	    return false;
+-	  }
+-      }
+-
+   /* In the shared -Bsymbolic case, discard space allocated for
+      dynamic pc-relative relocs against symbols which turn out to be
+      defined in regular objects.  For the normal shared case, discard
+diff --git a/ld/testsuite/ld-aarch64/aarch64-elf.exp b/ld/testsuite/ld-aarch64/aarch64-elf.exp
+index 31162277bd9..64476f111e0 100644
+--- a/ld/testsuite/ld-aarch64/aarch64-elf.exp
++++ b/ld/testsuite/ld-aarch64/aarch64-elf.exp
+@@ -407,8 +407,6 @@ set aarch64elflinktests {
+     {copy-reloc-exe-2.s} {{objdump -R copy-reloc-2.d}} "copy-reloc-2"}
+   {"ld-aarch64/exe with copy relocation elimination" "-e0 tmpdir/copy-reloc-so.so" "" ""
+     {copy-reloc-exe-eliminate.s} {{objdump -R copy-reloc-eliminate.d}} "copy-reloc-elimination"}
+-  {"Build .so with protected data" "-shared" "" "" {protected.s}
+-    {} "protected.so"}
+   {"ld-aarch64/so with global func" "-shared" "" "" {func-in-so.s}
+     {} "func-in-so.so"}
+   {"ld-aarch64/func sym hash opt for exe"
+@@ -418,15 +416,8 @@ set aarch64elflinktests {
+     {} "libbti-plt-so.so"}
+ }
+ 
+-set aarch64elfcclinktests [list \
+-  [list "copy relocation on protected data" \
+-    "-no-pie tmpdir/copy-reloc-exe.o tmpdir/protected.so" "" \
+-    {} {{error_output copy-reloc-protected.d}} "copy-reloc-protected"]
+-]
+-
+ if [check_shared_lib_support] {
+     run_ld_link_tests $aarch64elflinktests
+-    run_cc_link_tests $aarch64elfcclinktests
+ }
+ 
+ run_dump_test "bti-plt-3"
+diff --git a/ld/testsuite/ld-aarch64/copy-reloc-protected.d b/ld/testsuite/ld-aarch64/copy-reloc-protected.d
+deleted file mode 100644
+index 99a356a3df6..00000000000
+--- a/ld/testsuite/ld-aarch64/copy-reloc-protected.d
++++ /dev/null
+@@ -1,2 +0,0 @@
+-.*: tmpdir/copy-reloc-exe.o: copy relocation against non-copyable protected symbol `global_a'
+-#...
+diff --git a/ld/testsuite/ld-aarch64/protected.s b/ld/testsuite/ld-aarch64/protected.s
+deleted file mode 100644
+index eb3fb402dc4..00000000000
+--- a/ld/testsuite/ld-aarch64/protected.s
++++ /dev/null
+@@ -1,8 +0,0 @@
+-.global global_a
+-.protected global_a
+-.type global_a, %object
+-.size global_a, 4
+-
+-.data
+-global_a:
+-.word 0xcafedead

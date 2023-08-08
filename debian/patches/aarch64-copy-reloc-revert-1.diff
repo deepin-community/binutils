@@ -1,0 +1,23 @@
+diff --git a/bfd/elfnn-aarch64.c b/bfd/elfnn-aarch64.c
+index ce2632ecd30..81311fc5a32 100644
+--- a/bfd/elfnn-aarch64.c
++++ b/bfd/elfnn-aarch64.c
+@@ -10116,7 +10116,7 @@ const struct elf_size_info elfNN_aarch64_size_info =
+ #define elf_backend_dtrel_excludes_plt 1
+ #define elf_backend_got_header_size (GOT_ENTRY_SIZE * 3)
+ #define elf_backend_default_execstack  0
+-#define elf_backend_extern_protected_data 0
++#define elf_backend_extern_protected_data 1
+ #define elf_backend_hash_symbol elf_aarch64_hash_symbol
+ 
+ #undef	elf_backend_obj_attrs_section
+diff --git a/ld/testsuite/ld-aarch64/protected-data.d b/ld/testsuite/ld-aarch64/protected-data.d
+index ee9b4cfc6b5..5dabf04748c 100644
+--- a/ld/testsuite/ld-aarch64/protected-data.d
++++ b/ld/testsuite/ld-aarch64/protected-data.d
+@@ -2,4 +2,4 @@
+ #ld: -shared
+ #readelf: -r -W
+ #...
+-.* R_AARCH64_RELATIVE .*
++.* R_AARCH64_GLOB_DAT .* var.*

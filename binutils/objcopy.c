@@ -1,5 +1,5 @@
 /* objcopy.c -- copy object file from input to output, optionally massaging it.
-   Copyright (C) 1991-2022 Free Software Foundation, Inc.
+   Copyright (C) 1991-2023 Free Software Foundation, Inc.
 
    This file is part of GNU Binutils.
 
@@ -232,7 +232,8 @@ static enum
   compress_zlib = compress | 1 << 1,
   compress_gnu_zlib = compress | 1 << 2,
   compress_gabi_zlib = compress | 1 << 3,
-  decompress = 1 << 4
+  compress_zstd = compress | 1 << 4,
+  decompress = 1 << 5
 } do_debug_sections = nothing;
 
 /* Whether to generate ELF common symbols with the STT_COMMON type.  */
@@ -545,6 +546,11 @@ extern bool _bfd_srec_forceS3;
    the --verilog-data-width parameter.  */
 extern unsigned int VerilogDataWidth;
 
+/* Endianness of data for verilog output.
+   This variable is declared in bfd/verilog.c and is set in the
+   copy_object() function.  */
+extern enum bfd_endian VerilogDataEndianness;
+
 /* Forward declarations.  */
 static void setup_section (bfd *, asection *, void *);
 static void setup_bfd_headers (bfd *, bfd *);
@@ -678,8 +684,8 @@ copy_usage (FILE *stream, int exit_status)
                                    <commit>\n\
      --subsystem <name>[:<version>]\n\
                                    Set PE subsystem to <name> [& <version>]\n\
-     --compress-debug-sections[={none|zlib|zlib-gnu|zlib-gabi}]\n\
-                                   Compress DWARF debug sections using zlib\n\
+     --compress-debug-sections[={none|zlib|zlib-gnu|zlib-gabi|zstd}]\n\
+				   Compress DWARF debug sections\n\
      --decompress-debug-sections   Decompress DWARF debug sections using zlib\n\
      --elf-stt-common=[yes|no]     Generate ELF common symbols with STT_COMMON\n\
                                      type\n\
@@ -1048,6 +1054,20 @@ create_symbol_htabs (void)
   redefine_specific_reverse_htab = create_symbol_htab ();
 }
 
+static void
+delete_symbol_htabs (void)
+{
+  htab_delete (strip_specific_htab);
+  htab_delete (strip_unneeded_htab);
+  htab_delete (keep_specific_htab);
+  htab_delete (localize_specific_htab);
+  htab_delete (globalize_specific_htab);
+  htab_delete (keepglobal_specific_htab);
+  htab_delete (weaken_specific_htab);
+  htab_delete (redefine_specific_htab);
+  htab_delete (redefine_specific_reverse_htab);
+}
+
 /* Add a symbol to strip_specific_list.  */
 
 static void
@@ -1358,8 +1378,20 @@ is_strip_section_1 (bfd *abfd ATTRIBUTE_UNUSED, asection *sec)
 	{
 	  /* By default we don't want to strip .reloc section.
 	     This section has for pe-coff special meaning.   See
-	     pe-dll.c file in ld, and peXXigen.c in bfd for details.  */
-	  if (strcmp (bfd_section_name (sec), ".reloc") != 0)
+	     pe-dll.c file in ld, and peXXigen.c in bfd for details.
+	     Similarly we do not want to strip debuglink sections.  */
+	  const char * kept_sections[] =
+	    {
+	      ".reloc",
+	      ".gnu_debuglink",
+	      ".gnu_debugaltlink"
+	    };
+	  int i;
+
+	  for (i = ARRAY_SIZE (kept_sections);i--;)
+	    if (strcmp (bfd_section_name (sec), kept_sections[i]) == 0)
+	      break;
+	  if (i == -1)
 	    return true;
 	}
 
@@ -1681,11 +1713,11 @@ filter_symbols (bfd *abfd, bfd *obfd, asymbol **osyms,
 
       if (keep)
 	{
-	  if (((flags & BSF_GLOBAL) != 0
+	  if (((flags & (BSF_GLOBAL | BSF_GNU_UNIQUE))
 	       || undefined)
 	      && (weaken || is_specified_symbol (name, weaken_specific_htab)))
 	    {
-	      sym->flags &= ~ BSF_GLOBAL;
+	      sym->flags &= ~ (BSF_GLOBAL | BSF_GNU_UNIQUE);
 	      sym->flags |= BSF_WEAK;
 	    }
 
@@ -2628,12 +2660,19 @@ copy_object (bfd *ibfd, bfd *obfd, const bfd_arch_info_type *input_arch)
       return false;
     }
 
+  /* Set the Verilog output endianness based upon the input file's
+     endianness.  We may not be producing verilog format output,
+     but testing this just adds extra code this is not really
+     necessary.  */
+  VerilogDataEndianness = ibfd->xvec->byteorder;
+
   if (bfd_get_flavour (ibfd) != bfd_target_elf_flavour)
     {
       if ((do_debug_sections & compress) != 0
 	  && do_debug_sections != compress)
 	{
-	  non_fatal (_("--compress-debug-sections=[zlib|zlib-gnu|zlib-gabi] is unsupported on `%s'"),
+	  non_fatal (_ ("--compress-debug-sections=[zlib|zlib-gnu|zlib-gabi|"
+			"zstd] is unsupported on `%s'"),
 		     bfd_get_archive_filename (ibfd));
 	  return false;
 	}
@@ -2735,7 +2774,14 @@ copy_object (bfd *ibfd, bfd *obfd, const bfd_arch_info_type *input_arch)
       /* Copy PE parameters before changing them.  */
       if (bfd_get_flavour (ibfd) == bfd_target_coff_flavour
 	  && bfd_pei_p (ibfd))
-	pe->pe_opthdr = pe_data (ibfd)->pe_opthdr;
+	{
+	  pe->pe_opthdr = pe_data (ibfd)->pe_opthdr;
+
+ 	  if (preserve_dates)
+	    pe->timestamp = pe_data (ibfd)->coff.timestamp;
+	  else
+	    pe->timestamp = -1;
+	}
 
       if (pe_file_alignment != (bfd_vma) -1)
 	pe->pe_opthdr.FileAlignment = pe_file_alignment;
@@ -2773,19 +2819,11 @@ copy_object (bfd *ibfd, bfd *obfd, const bfd_arch_info_type *input_arch)
 
       if (pe_file_alignment > pe_section_alignment)
 	{
-	  char file_alignment[20], section_alignment[20];
-
-	  sprintf_vma (file_alignment, pe_file_alignment);
-	  sprintf_vma (section_alignment, pe_section_alignment);
-	  non_fatal (_("warning: file alignment (0x%s) > section alignment (0x%s)"),
-
-		     file_alignment, section_alignment);
+	  non_fatal (_("warning: file alignment (0x%" PRIx64
+		       ") > section alignment (0x%" PRIx64 ")"),
+		     (uint64_t) pe_file_alignment,
+		     (uint64_t) pe_section_alignment);
 	}
-
-      if (preserve_dates
-	  && bfd_get_flavour (ibfd) == bfd_target_coff_flavour
-	  && bfd_pei_p (ibfd))
-	pe->timestamp = pe_data (ibfd)->coff.timestamp;
     }
 
   free (isympp);
@@ -2943,11 +2981,9 @@ copy_object (bfd *ibfd, bfd *obfd, const bfd_arch_info_type *input_arch)
 	  bfd_size_type size = bfd_section_size (osec);
 
 	  if (size == 0)
-	    {
-	      bfd_nonfatal_message (NULL, ibfd, osec,
-				    _("warning: note section is empty"));
-	      continue;
-	    }
+	    /* This can happen, eg when stripping a binary for a second
+	       time.  See BZ 2121365 for an example.  */
+	    continue;
 
 	  merged_note_section * merged = xmalloc (sizeof * merged);
 	  merged->contents = NULL;
@@ -3049,7 +3085,7 @@ copy_object (bfd *ibfd, bfd *obfd, const bfd_arch_info_type *input_arch)
       if (bfd_get_section_by_name (obfd, ".gnu_debuglink"))
 	{
 	  non_fatal (_("%s: debuglink section already exists"),
-		     bfd_get_filename (obfd));
+		     bfd_get_filename (ibfd));
 	  gnu_debuglink_filename = NULL;
 	}
       else
@@ -3507,7 +3543,7 @@ copy_archive (bfd *ibfd, bfd *obfd, const char *output_target,
   bfd **ptr = &obfd->archive_head;
   bfd *this_element;
   char *dir;
-  const char *filename;
+  char *filename;
 
   /* PR 24281: It is not clear what should happen when copying a thin archive.
      One part is straight forward - if the output archive is in a different
@@ -3645,23 +3681,16 @@ copy_archive (bfd *ibfd, bfd *obfd, const char *output_target,
 	  if (del && bfd_get_arch (this_element) == bfd_arch_unknown)
 	    /* Try again as an unknown object file.  */
 	    ok_object = false;
-	  else if (!bfd_close (output_bfd))
-	    {
-	      bfd_nonfatal_message (output_name, NULL, NULL, NULL);
-	      /* Error in new object file. Don't change archive.  */
-	      status = 1;
-	    }
 	}
 
       if (!ok_object)
+	del = !copy_unknown_object (this_element, output_bfd);
+
+      if (!(ok_object && !del ? bfd_close : bfd_close_all_done) (output_bfd))
 	{
-	  del = !copy_unknown_object (this_element, output_bfd);
-	  if (!bfd_close_all_done (output_bfd))
-	    {
-	      bfd_nonfatal_message (output_name, NULL, NULL, NULL);
-	      /* Error in new object file. Don't change archive.  */
-	      status = 1;
-	    }
+	  bfd_nonfatal_message (output_name, NULL, NULL, NULL);
+	  /* Error in new object file. Don't change archive.  */
+	  status = 1;
 	}
 
       if (del)
@@ -3691,19 +3720,21 @@ copy_archive (bfd *ibfd, bfd *obfd, const char *output_target,
     }
   *ptr = NULL;
 
-  filename = bfd_get_filename (obfd);
-  if (!bfd_close (obfd))
+  filename = xstrdup (bfd_get_filename (obfd));
+  if (!(status == 0 ? bfd_close : bfd_close_all_done) (obfd))
     {
       status = 1;
       bfd_nonfatal_message (filename, NULL, NULL, NULL);
     }
+  free (filename);
 
-  filename = bfd_get_filename (ibfd);
+  filename = xstrdup (bfd_get_filename (ibfd));
   if (!bfd_close (ibfd))
     {
       status = 1;
       bfd_nonfatal_message (filename, NULL, NULL, NULL);
     }
+  free (filename);
 
  cleanup_and_exit:
   /* Delete all the files that we opened.  */
@@ -3719,12 +3750,14 @@ copy_archive (bfd *ibfd, bfd *obfd, const char *output_target,
 	    bfd_close (l->obfd);
 	    unlink (l->name);
 	  }
+	free ((char *) l->name);
 	next = l->next;
 	free (l);
       }
   }
 
   rmdir (dir);
+  free (dir);
 }
 
 static void
@@ -3773,15 +3806,24 @@ copy_file (const char *input_filename, const char *output_filename, int ofd,
 
   switch (do_debug_sections)
     {
+    case compress_gnu_zlib:
+      ibfd->flags |= BFD_COMPRESS;
+      break;
     case compress:
     case compress_zlib:
-    case compress_gnu_zlib:
+      /* The above two cases ought to just set BFD_COMPRESS for non-ELF
+	 but we can't tell whether a file is ELF or not until after
+	 bfd_check_format_matches.  FIXME maybe: decide compression
+	 style in BFD after bfd_check_format_matches.  */
     case compress_gabi_zlib:
-      ibfd->flags |= BFD_COMPRESS;
-      /* Don't check if input is ELF here since this information is
-	 only available after bfd_check_format_matches is called.  */
-      if (do_debug_sections != compress_gnu_zlib)
-	ibfd->flags |= BFD_COMPRESS_GABI;
+      ibfd->flags |= BFD_COMPRESS | BFD_COMPRESS_GABI;
+      break;
+    case compress_zstd:
+      ibfd->flags |= BFD_COMPRESS | BFD_COMPRESS_GABI | BFD_COMPRESS_ZSTD;
+#ifndef HAVE_ZSTD
+      fatal (_ ("--compress-debug-sections=zstd: binutils is not built with "
+		"zstd support"));
+#endif
       break;
     case decompress:
       ibfd->flags |= BFD_DECOMPRESS;
@@ -3911,15 +3953,9 @@ copy_file (const char *input_filename, const char *output_filename, int ofd,
       bfd_nonfatal_message (input_filename, NULL, NULL, NULL);
 
       if (obj_error == bfd_error_file_ambiguously_recognized)
-	{
-	  list_matching_formats (obj_matching);
-	  free (obj_matching);
-	}
+	list_matching_formats (obj_matching);
       if (core_error == bfd_error_file_ambiguously_recognized)
-	{
-	  list_matching_formats (core_matching);
-	  free (core_matching);
-	}
+	list_matching_formats (core_matching);
 
       status = 1;
     }
@@ -4009,7 +4045,7 @@ setup_section (bfd *ibfd, sec_ptr isection, void *obfdarg)
   bfd_vma vma;
   bfd_vma lma;
   flagword flags;
-  const char *err;
+  const char *err = NULL;
   const char * name;
   const char * new_name;
   char *prefix = NULL;
@@ -4064,17 +4100,33 @@ setup_section (bfd *ibfd, sec_ptr isection, void *obfdarg)
 	   && (flags & (SEC_ALLOC | SEC_GROUP)) != 0
 	   && !is_nondebug_keep_contents_section (ibfd, isection))
     {
-      flags &= ~(SEC_HAS_CONTENTS | SEC_LOAD | SEC_GROUP);
+      flagword clr = SEC_HAS_CONTENTS | SEC_LOAD | SEC_GROUP;
+
       if (bfd_get_flavour (obfd) == bfd_target_elf_flavour)
 	{
-	  make_nobits = true;
+	  /* PR 29532: Copy group sections intact as otherwise we end up with
+	     empty groups.  This prevents separate debug info files from
+	     being used with GDB, if they were based upon files that
+	     originally contained groups.  */
+	  if (flags & SEC_GROUP)
+	    clr = SEC_LOAD;
+	  else
+	    make_nobits = true;
 
 	  /* Twiddle the input section flags so that it seems to
 	     elf.c:copy_private_bfd_data that section flags have not
 	     changed between input and output sections.  This hack
 	     prevents wholesale rewriting of the program headers.  */
-	  isection->flags &= ~(SEC_HAS_CONTENTS | SEC_LOAD | SEC_GROUP);
+	  isection->flags &= ~clr;
 	}
+      flags &= ~clr;
+    }
+
+  if (!bfd_convert_section_setup (ibfd, isection, obfd, &name, &size))
+    {
+      osection = NULL;
+      err = _("failed to create output section");
+      goto loser;
     }
 
   osection = bfd_make_section_anyway_with_flags (obfd, name, flags);
@@ -4085,17 +4137,12 @@ setup_section (bfd *ibfd, sec_ptr isection, void *obfdarg)
       goto loser;
     }
 
-  size = bfd_section_size (isection);
-  size = bfd_convert_section_size (ibfd, isection, obfd, size);
   if (copy_byte >= 0)
     size = (size + interleave - 1) / interleave * copy_width;
   else if (extract_symbol)
     size = 0;
   if (!bfd_set_section_size (osection, size))
-    {
-      err = _("failed to set size");
-      goto loser;
-    }
+    err = _("failed to set size");
 
   vma = bfd_section_vma (isection);
   p = find_section_list (bfd_section_name (isection), false,
@@ -4111,10 +4158,7 @@ setup_section (bfd *ibfd, sec_ptr isection, void *obfdarg)
     vma += change_section_address;
 
   if (!bfd_set_section_vma (osection, vma))
-    {
-      err = _("failed to set vma");
-      goto loser;
-    }
+    err = _("failed to set vma");
 
   lma = isection->lma;
   p = find_section_list (bfd_section_name (isection), false,
@@ -4141,10 +4185,7 @@ setup_section (bfd *ibfd, sec_ptr isection, void *obfdarg)
   /* FIXME: This is probably not enough.  If we change the LMA we
      may have to recompute the header for the file as well.  */
   if (!bfd_set_section_alignment (osection, alignment))
-    {
-      err = _("failed to set alignment");
-      goto loser;
-    }
+    err = _("failed to set alignment");
 
   /* Copy merge entity size.  */
   osection->entsize = isection->entsize;
@@ -4173,16 +4214,13 @@ setup_section (bfd *ibfd, sec_ptr isection, void *obfdarg)
   /* Allow the BFD backend to copy any private data it understands
      from the input section to the output section.  */
   if (!bfd_copy_private_section_data (ibfd, isection, obfd, osection))
-    {
-      err = _("failed to copy private data");
-      goto loser;
-    }
+    err = _("failed to copy private data");
 
   if (make_nobits)
     elf_section_type (osection) = SHT_NOBITS;
 
-  /* All went well.  */
-  return;
+  if (!err)
+    return;
 
  loser:
   status = 1;
@@ -4313,10 +4351,7 @@ copy_relocations_in_section (bfd *ibfd, sec_ptr isection, void *obfdarg)
     }
 
   if (relsize == 0)
-    {
-      bfd_set_reloc (obfd, osection, NULL, 0);
-      osection->flags &= ~SEC_RELOC;
-    }
+    bfd_set_reloc (obfd, osection, NULL, 0);
   else
     {
       if (isection->orelocation != NULL)
@@ -4328,14 +4363,13 @@ copy_relocations_in_section (bfd *ibfd, sec_ptr isection, void *obfdarg)
 	}
       else
 	{
-	  relpp = (arelent **) xmalloc (relsize);
+	  relpp = bfd_xalloc (obfd, relsize);
 	  relcount = bfd_canonicalize_reloc (ibfd, isection, relpp, isympp);
 	  if (relcount < 0)
 	    {
 	      status = 1;
 	      bfd_nonfatal_message (NULL, ibfd, isection,
 				    _("relocation count is negative"));
-	      free (relpp);
 	      return;
 	    }
 	}
@@ -4344,34 +4378,22 @@ copy_relocations_in_section (bfd *ibfd, sec_ptr isection, void *obfdarg)
 	{
 	  /* Remove relocations which are not in
 	     keep_strip_specific_list.  */
-	  arelent **temp_relpp;
-	  long temp_relcount = 0;
+	  arelent **w_relpp;
 	  long i;
 
-	  temp_relpp = (arelent **) xmalloc (relsize);
-	  for (i = 0; i < relcount; i++)
-	    {
-	      /* PR 17512: file: 9e907e0c.  */
-	      if (relpp[i]->sym_ptr_ptr
-		  /* PR 20096 */
-		  && * relpp[i]->sym_ptr_ptr)
-		if (is_specified_symbol (bfd_asymbol_name (*relpp[i]->sym_ptr_ptr),
-					 keep_specific_htab))
-		  temp_relpp [temp_relcount++] = relpp [i];
-	    }
-	  relcount = temp_relcount;
-	  if (relpp != isection->orelocation)
-	    free (relpp);
-	  relpp = temp_relpp;
+	  for (w_relpp = relpp, i = 0; i < relcount; i++)
+	    /* PR 17512: file: 9e907e0c.  */
+	    if (relpp[i]->sym_ptr_ptr
+		/* PR 20096 */
+		&& *relpp[i]->sym_ptr_ptr
+		&& is_specified_symbol (bfd_asymbol_name (*relpp[i]->sym_ptr_ptr),
+					keep_specific_htab))
+	      *w_relpp++ = relpp[i];
+	  relcount = w_relpp - relpp;
+	  *w_relpp = 0;
 	}
 
       bfd_set_reloc (obfd, osection, relcount == 0 ? NULL : relpp, relcount);
-      if (relcount == 0)
-	{
-	  osection->flags &= ~SEC_RELOC;
-	  if (relpp != isection->orelocation)
-	    free (relpp);
-	}
     }
 }
 
@@ -4405,6 +4427,7 @@ copy_section (bfd *ibfd, sec_ptr isection, void *obfdarg)
 	  || !bfd_convert_section_contents (ibfd, isection, obfd,
 					    &memhunk, &size))
 	{
+	  bfd_set_section_size (osection, 0);
 	  status = 1;
 	  bfd_nonfatal_message (NULL, ibfd, isection, NULL);
 	  free (memhunk);
@@ -5465,6 +5488,8 @@ copy_main (int argc, char *argv[])
 		do_debug_sections = compress_gnu_zlib;
 	      else if (strcasecmp (optarg, "zlib-gabi") == 0)
 		do_debug_sections = compress_gabi_zlib;
+	      else if (strcasecmp (optarg, "zstd") == 0)
+		do_debug_sections = compress_zstd;
 	      else
 		fatal (_("unrecognized --compress-debug-sections type `%s'"),
 		       optarg);
@@ -5498,14 +5523,9 @@ copy_main (int argc, char *argv[])
 	    gap_fill_vma = parse_vma (optarg, "--gap-fill");
 	    gap_fill = (bfd_byte) gap_fill_vma;
 	    if ((bfd_vma) gap_fill != gap_fill_vma)
-	      {
-		char buff[20];
-
-		sprintf_vma (buff, gap_fill_vma);
-
-		non_fatal (_("Warning: truncating gap-fill from 0x%s to 0x%x"),
-			   buff, gap_fill);
-	      }
+	      non_fatal (_("Warning: truncating gap-fill from 0x%" PRIx64
+			   " to 0x%x"),
+			 (uint64_t) gap_fill_vma, gap_fill);
 	    gap_fill_set = true;
 	  }
 	  break;
@@ -5847,8 +5867,18 @@ copy_main (int argc, char *argv[])
 
 	case OPTION_VERILOG_DATA_WIDTH:
 	  VerilogDataWidth = parse_vma (optarg, "--verilog-data-width");
-	  if (VerilogDataWidth < 1)
-	    fatal (_("verilog data width must be at least 1 byte"));
+	  switch (VerilogDataWidth)
+	    {
+	    case 1:
+	    case 2:
+	    case 4:
+	    case 8:
+	    case 16: /* We do not support widths > 16 because the verilog
+			data is handled internally in 16 byte wide packets.  */
+	      break;
+	    default:
+	      fatal (_("error: verilog data width must be 1, 2, 4, 8 or 16"));
+	    }
 	  break;
 
 	case 0:
@@ -5971,32 +6001,20 @@ copy_main (int argc, char *argv[])
 	  if (! p->used)
 	    {
 	      if (p->context & (SECTION_CONTEXT_SET_VMA | SECTION_CONTEXT_ALTER_VMA))
-		{
-		  char buff [20];
-
-		  sprintf_vma (buff, p->vma_val);
-
-		  /* xgettext:c-format */
-		  non_fatal (_("%s %s%c0x%s never used"),
-			     "--change-section-vma",
-			     p->pattern,
-			     p->context & SECTION_CONTEXT_SET_VMA ? '=' : '+',
-			     buff);
-		}
+		/* xgettext:c-format */
+		non_fatal (_("%s %s%c0x%" PRIx64 " never used"),
+			   "--change-section-vma",
+			   p->pattern,
+			   p->context & SECTION_CONTEXT_SET_VMA ? '=' : '+',
+			   (uint64_t) p->vma_val);
 
 	      if (p->context & (SECTION_CONTEXT_SET_LMA | SECTION_CONTEXT_ALTER_LMA))
-		{
-		  char buff [20];
-
-		  sprintf_vma (buff, p->lma_val);
-
-		  /* xgettext:c-format */
-		  non_fatal (_("%s %s%c0x%s never used"),
-			     "--change-section-lma",
-			     p->pattern,
-			     p->context & SECTION_CONTEXT_SET_LMA ? '=' : '+',
-			     buff);
-		}
+		/* xgettext:c-format */
+		non_fatal (_("%s %s%c0x%" PRIx64 " never used"),
+			   "--change-section-lma",
+			   p->pattern,
+			   p->context & SECTION_CONTEXT_SET_LMA ? '=' : '+',
+			   (uint64_t) p->lma_val);
 	    }
 	}
     }
@@ -6051,6 +6069,7 @@ main (int argc, char *argv[])
     }
 
   create_symbol_htabs ();
+  xatexit (delete_symbol_htabs);
 
   if (argv != NULL)
     bfd_set_error_program_name (argv[0]);

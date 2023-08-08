@@ -1,5 +1,5 @@
-branch-updates.diff
-branch-version.diff
+#branch-updates.diff
+#branch-version.diff
 001_ld_makefile_patch.patch
 002_gprof_profile_arcs.patch
 003_gprof_see_also_monitor.patch
@@ -33,3 +33,12 @@ gold-no-keep-files-mapped.diff
 libctf-soname.diff
 
 mips-hack.diff
+
+#aarch64-copy-reloc-revert-0.diff
+#aarch64-copy-reloc-revert-1.diff
+#aarch64-copy-reloc-revert-2.diff
+
+perl-shebang.diff
+
+link-jansson.diff
+add-loong64-support.patch

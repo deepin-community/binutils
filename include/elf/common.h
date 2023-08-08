@@ -1,5 +1,5 @@
 /* ELF support for BFD.
-   Copyright (C) 1991-2022 Free Software Foundation, Inc.
+   Copyright (C) 1991-2023 Free Software Foundation, Inc.
 
    Written by Fred Fish @ Cygnus Support, from information published
    in "UNIX System V Release 4, Programmers Guide: ANSI C and
@@ -77,8 +77,11 @@
 #define ELFOSABI_OPENVOS     18 /* Stratus Technologies OpenVOS */
 
 #define ELFOSABI_C6000_ELFABI 64 /* Bare-metal TMS320C6000 */
+#define ELFOSABI_AMDGPU_HSA  64 /* AMD HSA Runtime */
 #define ELFOSABI_C6000_LINUX 65 /* Linux TMS320C6000 */
+#define ELFOSABI_AMDGPU_PAL  65 /* AMD PAL Runtime */
 #define ELFOSABI_ARM_FDPIC   65 /* ARM FDPIC */
+#define ELFOSABI_AMDGPU_MESA3D 66 /* AMD Mesa3D Runtime */
 #define ELFOSABI_ARM	     97	/* ARM */
 #define ELFOSABI_STANDALONE 255	/* Standalone (embedded) application */
 
@@ -354,6 +357,9 @@
 #define EM_65816	257	/* WDC 65816/65C816 */
 #define EM_LOONGARCH	258	/* LoongArch */
 #define EM_KF32		259	/* ChipON KungFu32 */
+#define EM_U16_U8CORE	260	/* LAPIS nX-U16/U8 */
+#define EM_TACHYUM	261	/* Tachyum */
+#define EM_56800EF	262	/* NXP 56800EF Digital Signal Controller (DSC) */
 
 /* If it is necessary to assign new unofficial EM_* values, please pick large
    random numbers (0x8523, 0xa7f2, etc.) to minimize the chances of collision
@@ -483,6 +489,7 @@
 #define PT_GNU_STACK	(PT_LOOS + 0x474e551) /* Stack flags */
 #define PT_GNU_RELRO	(PT_LOOS + 0x474e552) /* Read-only after relocation */
 #define PT_GNU_PROPERTY	(PT_LOOS + 0x474e553) /* GNU property */
+#define PT_GNU_SFRAME	(PT_LOOS + 0x474e554) /* SFrame unwind information */
 
 /* OpenBSD segment types.  */
 #define PT_OPENBSD_RANDOMIZE (PT_LOOS + 0x5a3dbe6)  /* Fill with random data.  */
@@ -582,6 +589,8 @@
 
 /* Compression types.  */
 #define ELFCOMPRESS_ZLIB   1		/* Compressed with zlib.  */
+#define ELFCOMPRESS_ZSTD   2		/* Compressed with zstd  */
+					/* (see http://www.zstandard.org). */
 #define ELFCOMPRESS_LOOS   0x60000000	/* OS-specific semantics, lo */
 #define ELFCOMPRESS_HIOS   0x6FFFFFFF	/* OS-specific semantics, hi */
 #define ELFCOMPRESS_LOPROC 0x70000000	/* Processor-specific semantics, lo */
@@ -669,6 +678,8 @@
 					/*   note name must be "LINUX".  */
 #define NT_ARM_HW_WATCH	0x403		/* AArch hardware watchpoint registers */
 					/*   note name must be "LINUX".  */
+#define NT_ARM_SYSTEM_CALL      0x404   /* AArch ARM system call number */
+					/*   note name must be "LINUX".  */
 #define NT_ARM_SVE	0x405		/* AArch SVE registers.  */
 					/*   note name must be "LINUX".  */
 #define NT_ARM_PAC_MASK	0x406		/* AArch pointer authentication code masks */
@@ -732,6 +743,7 @@
 #define	NT_FREEBSD_PROCSTAT_PSSTRINGS	15	/* Procstat ps_strings data. */
 #define	NT_FREEBSD_PROCSTAT_AUXV	16	/* Procstat auxv data. */
 #define	NT_FREEBSD_PTLWPINFO	17	/* Thread ptrace miscellaneous info. */
+#define	NT_FREEBSD_X86_SEGBASES	0x200	/* x86 segment base registers */
 
 /* Note segments for core files on NetBSD systems.  Note name
    must start with "NetBSD-CORE".  */
@@ -1394,6 +1406,8 @@
 #define AT_FREEBSD_PS_STRINGS   32      /* struct ps_strings. */
 #define AT_FREEBSD_FXRNG        33      /* Pointer to root RNG seed version. */
 #define AT_FREEBSD_KPRELOAD     34      /* Base of vdso. */
+#define AT_FREEBSD_USRSTACKBASE 35      /* Top of user stack. */
+#define AT_FREEBSD_USRSTACKLIM  36      /* Grow limit of user stack. */
 
 #define AT_SUN_UID      2000    /* Effective user ID.  */
 #define AT_SUN_RUID     2001    /* Real user ID.  */
