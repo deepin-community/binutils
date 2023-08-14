@@ -1349,11 +1349,6 @@ ifeq ($(with_gold),yes)
 	cp debian/ld.gold.1 $(d_com)/$(PF)/share/man/man1/
 	ln -s ld.gold.1.gz $(d_com)/$(PF)/share/man/man1/gold.1.gz
 
-ifeq ($(with_gprofng),yes)
-	$(install_dir) $(d_com)/etc
-	mv $(d_bin)/etc/gprofng.rc $(d_com)/etc/.
-endif
-
 	: # install a symlink for the gold linker
 	$(install_dir) $(d_bin)/$(PF)/lib/gold-ld
 	ln -s ../../bin/ld.gold $(d_bin)/$(PF)/lib/gold-ld/ld
@@ -1365,6 +1360,11 @@ endif
 	: # Remove empty directory
 	rmdir $(d_bin)/$(PF)/include/
 
+ifeq ($(with_gprofng),yes)
+	$(install_dir) $(d_com)/etc
+	mv $(d_bin)/etc/gprofng.rc $(d_com)/etc/.
+endif
+
 	: # Rename non-prefixed binaries to $(DEB_HOST_GNU_TYPE)- prefixed binaries
 	: # and provide symlinks to the prefixed binaries.
 	$(install_dir) $(d_nat)/$(PF)/bin $(d_nat)/$(PF)/share/man/man1
@@ -1372,7 +1372,9 @@ endif
 	  mv $(d_bin)/$(PF)/bin/$$i $(d_nat)/$(PF)/bin/$(DEB_HOST_GNU_TYPE)-$$i; \
 	  ln -sf $(DEB_HOST_GNU_TYPE)-$$i $(d_bin)/$(PF)/bin/$$i; \
 	done
+ifeq ($(with_gold),yes)
 	ln -sf $(DEB_HOST_GNU_TYPE)-ld.gold $(d_nat)/usr/bin/$(DEB_HOST_GNU_TYPE)-gold
+endif
 	for i in $(programs); do \
 	  ln -sf $$i.1.gz $(d_nat)/$(PF)/share/man/man1/$(DEB_HOST_GNU_TYPE)-$$i.1.gz; \
 	done
