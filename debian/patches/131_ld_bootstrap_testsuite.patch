@@ -20,7 +20,7 @@ Upstream status: proposed patch
  # Bootstrap ld.  First link the object files together using -r, in
  # order to test -r.  Then link the result into an executable, ld1, to
  # really test -r.  Use ld1 to link a fresh ld, ld2.  Use ld2 to link a
-@@ -124,6 +133,11 @@ foreach flags $test_flags {
+@@ -130,6 +139,11 @@ foreach flags $test_flags {
  	continue
      }
  
@@ -32,7 +32,7 @@ Upstream status: proposed patch
      # If we only have a shared libbfd, we probably can't run the
      # --static test.
      if { $flags == "--static" && ! [string match "*libbfd.a*" $BFDLIB] } then {
-@@ -178,6 +192,10 @@ foreach flags $test_flags {
+@@ -184,6 +198,10 @@ foreach flags $test_flags {
  	}
      }
  

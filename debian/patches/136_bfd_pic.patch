@@ -14,7 +14,7 @@ Description: Build libbfd with -fPIC to allow linking with PIE binaries
  bfdinclude_HEADERS += $(INCDIR)/plugin-api.h
 --- a/bfd/Makefile.in
 +++ b/bfd/Makefile.in
-@@ -514,7 +514,7 @@ libbfd_la_LDFLAGS = $(am__append_1) -rel
+@@ -525,7 +525,7 @@ libbfd_la_LDFLAGS = $(am__append_1) -rel
  # case both are empty.
  ZLIB = @zlibdir@ -lz
  ZLIBINC = @zlibinc@

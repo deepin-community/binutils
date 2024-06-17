@@ -15,7 +15,7 @@ Upstream status: local
  
 --- a/gold/Makefile.in
 +++ b/gold/Makefile.in
-@@ -666,7 +666,7 @@ top_srcdir = @top_srcdir@
+@@ -681,7 +681,7 @@ top_srcdir = @top_srcdir@
  zlibdir = @zlibdir@
  zlibinc = @zlibinc@
  AUTOMAKE_OPTIONS = foreign

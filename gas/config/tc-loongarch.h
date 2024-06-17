@@ -1,5 +1,5 @@
 /* tc-loongarch.h -- Header file for tc-loongarch.c.
-   Copyright (C) 2021-2023 Free Software Foundation, Inc.
+   Copyright (C) 2021-2024 Free Software Foundation, Inc.
    Contributed by Loongson Ltd.
 
    This file is part of GAS.
@@ -49,11 +49,11 @@ extern int loongarch_relax_frag (asection *, struct frag *, long);
 #define md_undefined_symbol(name) (0)
 #define md_operand(x)
 
-extern bool loongarch_frag_align_code (int);
+extern bool loongarch_frag_align_code (int, int);
 #define md_do_align(N, FILL, LEN, MAX, LABEL)				\
   if ((N) != 0 && !(FILL) && !need_pass_2 && subseg_text_p (now_seg))	\
     {									\
-      if (loongarch_frag_align_code (N))				\
+      if (loongarch_frag_align_code (N, MAX))				\
 	goto LABEL;							\
     }
 
@@ -71,8 +71,17 @@ extern bool loongarch_frag_align_code (int);
    relaxation, so do not resolve such expressions in the assembler.  */
 #define md_allow_local_subtract(l,r,s) 0
 
-/* Values passed to md_apply_fix don't include symbol values.  */
-#define TC_FORCE_RELOCATION_SUB_LOCAL(FIX, SEG) 1
+/* If subsy of BFD_RELOC32/64 and PC in same segment, and without relax
+   or PC at start of subsy or with relax but sub_symbol_segment not in
+   SEC_CODE, we generate 32/64_PCREL.  */
+#define TC_FORCE_RELOCATION_SUB_LOCAL(FIX, SEG) \
+  (!(LARCH_opts.thin_add_sub \
+     && (BFD_RELOC_32 || BFD_RELOC_64) \
+     && (!LARCH_opts.relax \
+	|| S_GET_VALUE (FIX->fx_subsy) \
+	   == FIX->fx_frag->fr_address + FIX->fx_where \
+	|| (LARCH_opts.relax \
+	   && ((S_GET_SEGMENT (FIX->fx_subsy)->flags & SEC_CODE) == 0)))))
 
 #define TC_VALIDATE_FIX_SUB(FIX, SEG) 1
 #define DIFF_EXPR_OK 1
@@ -115,6 +124,7 @@ extern void tc_loongarch_parse_to_dw2regnum (expressionS *);
 
 extern void loongarch_pre_output_hook (void);
 #define md_pre_output_hook loongarch_pre_output_hook ()
+#define GAS_SORT_RELOCS 1
 
 #define SUB_SEGMENT_ALIGN(SEG, FRCHAIN) 0
 

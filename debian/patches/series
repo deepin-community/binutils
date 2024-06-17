@@ -1,5 +1,6 @@
 branch-updates.diff
-#branch-version.diff
+branch-version.diff
+bpf-updates.diff
 001_ld_makefile_patch.patch
 002_gprof_profile_arcs.patch
 003_gprof_see_also_monitor.patch
@@ -22,12 +23,9 @@ branch-updates.diff
 gprof-build.diff
 aarch64-libpath.diff
 #pr-ld-16428.diff
-gold-mips.diff
 gold-no-keep-files-mapped.diff
 
 # trunk backports
-objcopy-timestamps.diff
-gprofng-large-files.diff
 
 # experimental ...
 #infinity-notes.diff
@@ -38,4 +36,3 @@ mips-hack.diff
 perl-shebang.diff
 
 link-jansson.diff
-pr30700.diff

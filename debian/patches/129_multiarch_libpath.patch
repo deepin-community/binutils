@@ -2,15 +2,15 @@
 
 --- a/gold/configure
 +++ b/gold/configure
-@@ -625,6 +625,7 @@ LTLIBOBJS
+@@ -626,6 +626,7 @@ LTLIBOBJS
  MAINT
  MAINTAINER_MODE_FALSE
  MAINTAINER_MODE_TRUE
 +MULTIARCH_DIRNAME
+ HAVE_CXX11
  DLOPEN_LIBS
  CXXCPP
- HAVE_NO_USE_LINKER_PLUGIN_FALSE
-@@ -10854,6 +10855,14 @@ $as_echo "#define HAVE_LC_MESSAGES 1" >>
+@@ -13753,6 +13754,14 @@ $as_echo "#define HAVE_LC_MESSAGES 1" >>
    fi
  
  
@@ -27,7 +27,7 @@
  $as_echo_n "checking whether to enable maintainer-specific portions of Makefiles... " >&6; }
 --- a/gold/configure.ac
 +++ b/gold/configure.ac
-@@ -734,6 +734,14 @@ AC_CHECK_HEADERS(locale.h)
+@@ -738,6 +738,14 @@ AC_CHECK_HEADERS(locale.h)
  AC_CHECK_FUNCS(setlocale)
  AM_LC_MESSAGES
  
@@ -54,7 +54,15 @@
  LIBIBERTY = ../libiberty/libiberty.a
 --- a/gold/Makefile.in
 +++ b/gold/Makefile.in
-@@ -684,6 +684,7 @@ AM_CPPFLAGS = \
+@@ -583,6 +583,7 @@ MKDIR_P = @MKDIR_P@
+ MKINSTALLDIRS = @MKINSTALLDIRS@
+ MSGFMT = @MSGFMT@
+ MSGMERGE = @MSGMERGE@
++MULTIARCH_DIRNAME = @MULTIARCH_DIRNAME@
+ NM = @NM@
+ NO_WERROR = @NO_WERROR@
+ OBJEXT = @OBJEXT@
+@@ -698,6 +699,7 @@ AM_CPPFLAGS = \
  	-I$(srcdir) -I$(srcdir)/../include -I$(srcdir)/../elfcpp \
  	-DLOCALEDIR="\"$(datadir)/locale\"" \
  	-DBINDIR="\"$(bindir)\"" -DTOOLBINDIR="\"$(tooldir)/bin\"" \
@@ -82,7 +90,7 @@
  	this->add_to_library_path_with_sysroot(TOOLLIBDIR);
 --- a/ld/genscripts.sh
 +++ b/ld/genscripts.sh
-@@ -235,6 +235,104 @@ append_to_lib_path()
+@@ -229,6 +229,104 @@ append_to_lib_path()
    fi
  }
  
@@ -187,7 +195,7 @@
  # Always search $(tooldir)/lib, aka /usr/local/TARGET/lib when native
  # except when LIBPATH=":".
  if [ "${LIB_PATH}" != ":" ] ; then
-@@ -253,6 +351,13 @@ if [ "${LIB_PATH}" != ":" ] ; then
+@@ -247,6 +345,13 @@ if [ "${LIB_PATH}" != ":" ] ; then
        case "${NATIVE}:${libpath_suffix}:${TOOL_LIB}" in
  	:* | *::* | *:*:*${libpath_suffix}) ;;
  	*) libs="${exec_prefix}/${target_alias}/lib${libpath_suffix}" ;;
@@ -201,7 +209,7 @@
        esac
      done
      libs="${exec_prefix}/${TOOL_LIB}/lib ${libs}"
-@@ -260,24 +365,124 @@ if [ "${LIB_PATH}" != ":" ] ; then
+@@ -254,24 +359,124 @@ if [ "${LIB_PATH}" != ":" ] ; then
    append_to_lib_path ${libs}
  fi
  

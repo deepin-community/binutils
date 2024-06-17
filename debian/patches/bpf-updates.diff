@@ -1,0 +1,340 @@
+git diff f3911963c51c11c70007287c91948328f1eea1db 920d9f0b39e9e8e42134c0317e772dbb93cdf8c8 
+
+gas/
+
+2024-01-29  Jose E. Marchesi  <jose.marchesi@oracle.com>
+
+	* doc/c-bpf.texi (BPF Instructions): There is no indirect 64-bit
+	load instruction.
+	(BPF Instructions): There is no absolute 64-bit load instruction.
+	* testsuite/gas/bpf/mem.s: Update test accordingly.
+	* testsuite/gas/bpf/mem-be-pseudoc.d: Likewise.
+	* testsuite/gas/bpf/mem-be.d: Likewise.
+	* testsuite/gas/bpf/mem-pseudoc.d: Likewise.
+	* testsuite/gas/bpf/mem-pseudoc.s: Likewise.
+	* testsuite/gas/bpf/mem.d: Likewise.
+	* testsuite/gas/bpf/mem.s: Likewise.
+
+include/
+
+2024-01-29  Jose E. Marchesi  <jose.marchesi@oracle.com>
+
+	* opcode/bpf.h (enum bpf_insn_id): Remove BPF_INSN_LDINDDW and
+	BPF_INSN_LDABSDW instructions.
+
+opcodes/
+
+2024-01-29  Jose E. Marchesi  <jose.marchesi@oracle.com>
+
+	* bpf-opc.c (bpf_opcodes): Remove BPF_INSN_LDINDDW and
+	BPF_INSN_LDABSDW instructions.
+
+ 
+diff --git a/gas/doc/c-bpf.texi b/gas/doc/c-bpf.texi
+index db8cd1115fd..d99538f16a9 100644
+--- a/gas/doc/c-bpf.texi
++++ b/gas/doc/c-bpf.texi
+@@ -451,10 +451,6 @@ tree for more information.
+ Absolute loads:
+ 
+ @table @code
+-@item ldabsdw imm32
+-@itemx r0 = *(u64 *) skb[imm32]
+-Absolute 64-bit load.
+-
+ @item ldabsw imm32
+ @itemx r0 = *(u32 *) skb[imm32]
+ Absolute 32-bit load.
+@@ -471,10 +467,6 @@ Absolute 8-bit load.
+ Indirect loads:
+ 
+ @table @code
+-@item ldinddw rs, imm32
+-@itemx r0 = *(u64 *) skb[rs + imm32]
+-Indirect 64-bit load.
+-
+ @item ldindw rs, imm32
+ @itemx r0 = *(u32 *) skb[rs + imm32]
+ Indirect 32-bit load.
+diff --git a/gas/testsuite/gas/bpf/mem-be-pseudoc.d b/gas/testsuite/gas/bpf/mem-be-pseudoc.d
+index 3d40567223f..b7715c463a2 100644
+--- a/gas/testsuite/gas/bpf/mem-be-pseudoc.d
++++ b/gas/testsuite/gas/bpf/mem-be-pseudoc.d
+@@ -11,26 +11,23 @@ Disassembly of section .text:
+    0:	20 00 00 00 00 00 be ef 	r0=\*\(u32\*\)skb\[0xbeef\]
+    8:	28 00 00 00 00 00 be ef 	r0=\*\(u16\*\)skb\[0xbeef\]
+   10:	30 00 00 00 00 00 be ef 	r0=\*\(u8\*\)skb\[0xbeef\]
+-  18:	38 00 00 00 00 00 be ef 	r0=\*\(u64\*\)skb\[0xbeef\]
+-  20:	40 03 00 00 00 00 be ef 	r0=\*\(u32\*\)skb\[r3\+0xbeef\]
+-  28:	48 05 00 00 00 00 be ef 	r0=\*\(u16\*\)skb\[r5\+0xbeef\]
+-  30:	50 07 00 00 00 00 be ef 	r0=\*\(u8\*\)skb\[r7\+0xbeef\]
+-  38:	58 09 00 00 00 00 be ef 	r0=\*\(u64\*\)skb\[r9\+0xbeef\]
+-  40:	61 21 7e ef 00 00 00 00 	r2=\*\(u32\*\)\(r1\+0x7eef\)
+-  48:	69 21 7e ef 00 00 00 00 	r2=\*\(u16\*\)\(r1\+0x7eef\)
+-  50:	71 21 7e ef 00 00 00 00 	r2=\*\(u8\*\)\(r1\+0x7eef\)
+-  58:	79 21 ff fe 00 00 00 00 	r2=\*\(u64\*\)\(r1\+0xfffe\)
+-  60:	63 12 7e ef 00 00 00 00 	\*\(u32\*\)\(r1\+0x7eef\)=r2
+-  68:	6b 12 7e ef 00 00 00 00 	\*\(u16\*\)\(r1\+0x7eef\)=r2
+-  70:	73 12 7e ef 00 00 00 00 	\*\(u8\*\)\(r1\+0x7eef\)=r2
+-  78:	7b 12 ff fe 00 00 00 00 	\*\(u64\*\)\(r1\+0xfffe\)=r2
+-  80:	72 10 7e ef 11 22 33 44 	\*\(u8\*\)\(r1\+0x7eef\)=0x11223344
+-  88:	6a 10 7e ef 11 22 33 44 	\*\(u16\*\)\(r1\+0x7eef\)=0x11223344
+-  90:	62 10 7e ef 11 22 33 44 	\*\(u32\*\)\(r1\+0x7eef\)=0x11223344
+-  98:	7a 10 ff fe 11 22 33 44 	\*\(u64\*\)\(r1\+0xfffe\)=0x11223344
+-  a0:	81 21 7e ef 00 00 00 00 	r2=\*\(s32\*\)\(r1\+0x7eef\)
+-  a8:	89 21 7e ef 00 00 00 00 	r2=\*\(s16\*\)\(r1\+0x7eef\)
+-  b0:	91 21 7e ef 00 00 00 00 	r2=\*\(s8\*\)\(r1\+0x7eef\)
+-  b8:	99 21 7e ef 00 00 00 00 	r2=\*\(s64\*\)\(r1\+0x7eef\)
+-  c0:	58 05 00 00 00 00 00 00 	r0=\*\(u64\*\)skb\[r5\+0x0\]
+-  c8:	61 21 00 00 00 00 00 00 	r2=\*\(u32\*\)\(r1\+0x0\)
++  18:	40 03 00 00 00 00 be ef 	r0=\*\(u32\*\)skb\[r3\+0xbeef\]
++  20:	48 05 00 00 00 00 be ef 	r0=\*\(u16\*\)skb\[r5\+0xbeef\]
++  28:	50 07 00 00 00 00 be ef 	r0=\*\(u8\*\)skb\[r7\+0xbeef\]
++  30:	61 21 7e ef 00 00 00 00 	r2=\*\(u32\*\)\(r1\+0x7eef\)
++  38:	69 21 7e ef 00 00 00 00 	r2=\*\(u16\*\)\(r1\+0x7eef\)
++  40:	71 21 7e ef 00 00 00 00 	r2=\*\(u8\*\)\(r1\+0x7eef\)
++  48:	79 21 ff fe 00 00 00 00 	r2=\*\(u64\*\)\(r1\+0xfffe\)
++  50:	63 12 7e ef 00 00 00 00 	\*\(u32\*\)\(r1\+0x7eef\)=r2
++  58:	6b 12 7e ef 00 00 00 00 	\*\(u16\*\)\(r1\+0x7eef\)=r2
++  60:	73 12 7e ef 00 00 00 00 	\*\(u8\*\)\(r1\+0x7eef\)=r2
++  68:	7b 12 ff fe 00 00 00 00 	\*\(u64\*\)\(r1\+0xfffe\)=r2
++  70:	72 10 7e ef 11 22 33 44 	\*\(u8\*\)\(r1\+0x7eef\)=0x11223344
++  78:	6a 10 7e ef 11 22 33 44 	\*\(u16\*\)\(r1\+0x7eef\)=0x11223344
++  80:	62 10 7e ef 11 22 33 44 	\*\(u32\*\)\(r1\+0x7eef\)=0x11223344
++  88:	7a 10 ff fe 11 22 33 44 	\*\(u64\*\)\(r1\+0xfffe\)=0x11223344
++  90:	81 21 7e ef 00 00 00 00 	r2=\*\(s32\*\)\(r1\+0x7eef\)
++  98:	89 21 7e ef 00 00 00 00 	r2=\*\(s16\*\)\(r1\+0x7eef\)
++  a0:	91 21 7e ef 00 00 00 00 	r2=\*\(s8\*\)\(r1\+0x7eef\)
++  a8:	99 21 7e ef 00 00 00 00 	r2=\*\(s64\*\)\(r1\+0x7eef\)
++  b0:	61 21 00 00 00 00 00 00 	r2=\*\(u32\*\)\(r1\+0x0\)
+diff --git a/gas/testsuite/gas/bpf/mem-be.d b/gas/testsuite/gas/bpf/mem-be.d
+index cd7b35c60a3..fc71cbda9e1 100644
+--- a/gas/testsuite/gas/bpf/mem-be.d
++++ b/gas/testsuite/gas/bpf/mem-be.d
+@@ -11,26 +11,24 @@ Disassembly of section .text:
+    0:	20 00 00 00 00 00 be ef 	ldabsw 0xbeef
+    8:	28 00 00 00 00 00 be ef 	ldabsh 0xbeef
+   10:	30 00 00 00 00 00 be ef 	ldabsb 0xbeef
+-  18:	38 00 00 00 00 00 be ef 	ldabsdw 0xbeef
+-  20:	40 03 00 00 00 00 be ef 	ldindw %r3,0xbeef
+-  28:	48 05 00 00 00 00 be ef 	ldindh %r5,0xbeef
+-  30:	50 07 00 00 00 00 be ef 	ldindb %r7,0xbeef
+-  38:	58 09 00 00 00 00 be ef 	ldinddw %r9,0xbeef
+-  40:	61 21 7e ef 00 00 00 00 	ldxw %r2,\[%r1\+0x7eef\]
+-  48:	69 21 7e ef 00 00 00 00 	ldxh %r2,\[%r1\+0x7eef\]
+-  50:	71 21 7e ef 00 00 00 00 	ldxb %r2,\[%r1\+0x7eef\]
+-  58:	79 21 ff fe 00 00 00 00 	ldxdw %r2,\[%r1\+0xfffe\]
+-  60:	63 12 7e ef 00 00 00 00 	stxw \[%r1\+0x7eef\],%r2
+-  68:	6b 12 7e ef 00 00 00 00 	stxh \[%r1\+0x7eef\],%r2
+-  70:	73 12 7e ef 00 00 00 00 	stxb \[%r1\+0x7eef\],%r2
+-  78:	7b 12 ff fe 00 00 00 00 	stxdw \[%r1\+0xfffe\],%r2
+-  80:	72 10 7e ef 11 22 33 44 	stb \[%r1\+0x7eef\],0x11223344
+-  88:	6a 10 7e ef 11 22 33 44 	sth \[%r1\+0x7eef\],0x11223344
+-  90:	62 10 7e ef 11 22 33 44 	stw \[%r1\+0x7eef\],0x11223344
+-  98:	7a 10 ff fe 11 22 33 44 	stdw \[%r1\+0xfffe\],0x11223344
+-  a0:	81 21 7e ef 00 00 00 00 	ldxsw %r2,\[%r1\+0x7eef\]
+-  a8:	89 21 7e ef 00 00 00 00 	ldxsh %r2,\[%r1\+0x7eef\]
+-  b0:	91 21 7e ef 00 00 00 00 	ldxsb %r2,\[%r1\+0x7eef\]
+-  b8:	99 21 7e ef 00 00 00 00 	ldxsdw %r2,\[%r1\+0x7eef\]
+-  c0:	79 21 00 00 00 00 00 00 	ldxdw %r2,\[%r1\+0x0\]
+-  c8:	40 03 00 00 00 00 00 00 	ldindw %r3,0x0
++  18:	40 03 00 00 00 00 be ef 	ldindw %r3,0xbeef
++  20:	48 05 00 00 00 00 be ef 	ldindh %r5,0xbeef
++  28:	50 07 00 00 00 00 be ef 	ldindb %r7,0xbeef
++  30:	61 21 7e ef 00 00 00 00 	ldxw %r2,\[%r1\+0x7eef\]
++  38:	69 21 7e ef 00 00 00 00 	ldxh %r2,\[%r1\+0x7eef\]
++  40:	71 21 7e ef 00 00 00 00 	ldxb %r2,\[%r1\+0x7eef\]
++  48:	79 21 ff fe 00 00 00 00 	ldxdw %r2,\[%r1\+0xfffe\]
++  50:	63 12 7e ef 00 00 00 00 	stxw \[%r1\+0x7eef\],%r2
++  58:	6b 12 7e ef 00 00 00 00 	stxh \[%r1\+0x7eef\],%r2
++  60:	73 12 7e ef 00 00 00 00 	stxb \[%r1\+0x7eef\],%r2
++  68:	7b 12 ff fe 00 00 00 00 	stxdw \[%r1\+0xfffe\],%r2
++  70:	72 10 7e ef 11 22 33 44 	stb \[%r1\+0x7eef\],0x11223344
++  78:	6a 10 7e ef 11 22 33 44 	sth \[%r1\+0x7eef\],0x11223344
++  80:	62 10 7e ef 11 22 33 44 	stw \[%r1\+0x7eef\],0x11223344
++  88:	7a 10 ff fe 11 22 33 44 	stdw \[%r1\+0xfffe\],0x11223344
++  90:	81 21 7e ef 00 00 00 00 	ldxsw %r2,\[%r1\+0x7eef\]
++  98:	89 21 7e ef 00 00 00 00 	ldxsh %r2,\[%r1\+0x7eef\]
++  a0:	91 21 7e ef 00 00 00 00 	ldxsb %r2,\[%r1\+0x7eef\]
++  a8:	99 21 7e ef 00 00 00 00 	ldxsdw %r2,\[%r1\+0x7eef\]
++  b0:	79 21 00 00 00 00 00 00 	ldxdw %r2,\[%r1\+0x0\]
++  b8:	40 03 00 00 00 00 00 00 	ldindw %r3,0x0
+diff --git a/gas/testsuite/gas/bpf/mem-pseudoc.d b/gas/testsuite/gas/bpf/mem-pseudoc.d
+index 7c37c16b6b8..b704de51f8f 100644
+--- a/gas/testsuite/gas/bpf/mem-pseudoc.d
++++ b/gas/testsuite/gas/bpf/mem-pseudoc.d
+@@ -11,26 +11,23 @@ Disassembly of section .text:
+    0:	20 00 00 00 ef be 00 00 	r0=\*\(u32\*\)skb\[0xbeef\]
+    8:	28 00 00 00 ef be 00 00 	r0=\*\(u16\*\)skb\[0xbeef\]
+   10:	30 00 00 00 ef be 00 00 	r0=\*\(u8\*\)skb\[0xbeef\]
+-  18:	38 00 00 00 ef be 00 00 	r0=\*\(u64\*\)skb\[0xbeef\]
+-  20:	40 30 00 00 ef be 00 00 	r0=\*\(u32\*\)skb\[r3\+0xbeef\]
+-  28:	48 50 00 00 ef be 00 00 	r0=\*\(u16\*\)skb\[r5\+0xbeef\]
+-  30:	50 70 00 00 ef be 00 00 	r0=\*\(u8\*\)skb\[r7\+0xbeef\]
+-  38:	58 90 00 00 ef be 00 00 	r0=\*\(u64\*\)skb\[r9\+0xbeef\]
+-  40:	61 12 ef 7e 00 00 00 00 	r2=\*\(u32\*\)\(r1\+0x7eef\)
+-  48:	69 12 ef 7e 00 00 00 00 	r2=\*\(u16\*\)\(r1\+0x7eef\)
+-  50:	71 12 ef 7e 00 00 00 00 	r2=\*\(u8\*\)\(r1\+0x7eef\)
+-  58:	79 12 fe ff 00 00 00 00 	r2=\*\(u64\*\)\(r1\+0xfffe\)
+-  60:	63 21 ef 7e 00 00 00 00 	\*\(u32\*\)\(r1\+0x7eef\)=r2
+-  68:	6b 21 ef 7e 00 00 00 00 	\*\(u16\*\)\(r1\+0x7eef\)=r2
+-  70:	73 21 ef 7e 00 00 00 00 	\*\(u8\*\)\(r1\+0x7eef\)=r2
+-  78:	7b 21 fe ff 00 00 00 00 	\*\(u64\*\)\(r1\+0xfffe\)=r2
+-  80:	72 01 ef 7e 44 33 22 11 	\*\(u8\*\)\(r1\+0x7eef\)=0x11223344
+-  88:	6a 01 ef 7e 44 33 22 11 	\*\(u16\*\)\(r1\+0x7eef\)=0x11223344
+-  90:	62 01 ef 7e 44 33 22 11 	\*\(u32\*\)\(r1\+0x7eef\)=0x11223344
+-  98:	7a 01 fe ff 44 33 22 11 	\*\(u64\*\)\(r1\+0xfffe\)=0x11223344
+-  a0:	81 12 ef 7e 00 00 00 00 	r2=\*\(s32\*\)\(r1\+0x7eef\)
+-  a8:	89 12 ef 7e 00 00 00 00 	r2=\*\(s16\*\)\(r1\+0x7eef\)
+-  b0:	91 12 ef 7e 00 00 00 00 	r2=\*\(s8\*\)\(r1\+0x7eef\)
+-  b8:	99 12 ef 7e 00 00 00 00 	r2=\*\(s64\*\)\(r1\+0x7eef\)
+-  c0:	58 50 00 00 00 00 00 00 	r0=\*\(u64\*\)skb\[r5\+0x0\]
+-  c8:	61 12 00 00 00 00 00 00 	r2=\*\(u32\*\)\(r1\+0x0\)
++  18:	40 30 00 00 ef be 00 00 	r0=\*\(u32\*\)skb\[r3\+0xbeef\]
++  20:	48 50 00 00 ef be 00 00 	r0=\*\(u16\*\)skb\[r5\+0xbeef\]
++  28:	50 70 00 00 ef be 00 00 	r0=\*\(u8\*\)skb\[r7\+0xbeef\]
++  30:	61 12 ef 7e 00 00 00 00 	r2=\*\(u32\*\)\(r1\+0x7eef\)
++  38:	69 12 ef 7e 00 00 00 00 	r2=\*\(u16\*\)\(r1\+0x7eef\)
++  40:	71 12 ef 7e 00 00 00 00 	r2=\*\(u8\*\)\(r1\+0x7eef\)
++  48:	79 12 fe ff 00 00 00 00 	r2=\*\(u64\*\)\(r1\+0xfffe\)
++  50:	63 21 ef 7e 00 00 00 00 	\*\(u32\*\)\(r1\+0x7eef\)=r2
++  58:	6b 21 ef 7e 00 00 00 00 	\*\(u16\*\)\(r1\+0x7eef\)=r2
++  60:	73 21 ef 7e 00 00 00 00 	\*\(u8\*\)\(r1\+0x7eef\)=r2
++  68:	7b 21 fe ff 00 00 00 00 	\*\(u64\*\)\(r1\+0xfffe\)=r2
++  70:	72 01 ef 7e 44 33 22 11 	\*\(u8\*\)\(r1\+0x7eef\)=0x11223344
++  78:	6a 01 ef 7e 44 33 22 11 	\*\(u16\*\)\(r1\+0x7eef\)=0x11223344
++  80:	62 01 ef 7e 44 33 22 11 	\*\(u32\*\)\(r1\+0x7eef\)=0x11223344
++  88:	7a 01 fe ff 44 33 22 11 	\*\(u64\*\)\(r1\+0xfffe\)=0x11223344
++  90:	81 12 ef 7e 00 00 00 00 	r2=\*\(s32\*\)\(r1\+0x7eef\)
++  98:	89 12 ef 7e 00 00 00 00 	r2=\*\(s16\*\)\(r1\+0x7eef\)
++  a0:	91 12 ef 7e 00 00 00 00 	r2=\*\(s8\*\)\(r1\+0x7eef\)
++  a8:	99 12 ef 7e 00 00 00 00 	r2=\*\(s64\*\)\(r1\+0x7eef\)
++  b0:	61 12 00 00 00 00 00 00 	r2=\*\(u32\*\)\(r1\+0x0\)
+diff --git a/gas/testsuite/gas/bpf/mem-pseudoc.s b/gas/testsuite/gas/bpf/mem-pseudoc.s
+index 823083d498a..19907753916 100644
+--- a/gas/testsuite/gas/bpf/mem-pseudoc.s
++++ b/gas/testsuite/gas/bpf/mem-pseudoc.s
+@@ -4,11 +4,9 @@
+ 	r0 = *(u32 *)skb[48879]
+ 	r0 = *(u16 *)skb[48879]
+ 	r0 = *(u8 *)skb[48879]
+-	r0 = *(u64 *)skb[48879]
+ 	r0 = *(u32 *)skb[r3 + 0xbeef]
+ 	r0 = *(u16 *)skb[r5 + 0xbeef]
+ 	r0 = *(u8 *)skb[r7 + 0xbeef]
+-	r0 = *(u64 *)skb[r9 + 0xbeef]
+ 	r2 = *(u32 *)(r1 + 32495)
+ 	r2 = *(u16 *)(r1 + 32495)
+ 	r2 = *(u8 *)(r1 + 32495)
+@@ -25,5 +23,4 @@
+         r2 = *(s16*)(r1+0x7eef)
+         r2 = *(s8*)(r1+0x7eef)
+         r2 = *(s64*)(r1+0x7eef)
+-	r0 = *(u64 *)skb[r5 + 0]
+ 	r2 = *(u32 *)(r1 + 0)
+diff --git a/gas/testsuite/gas/bpf/mem.d b/gas/testsuite/gas/bpf/mem.d
+index 9a1e7095df0..e51ebb103fb 100644
+--- a/gas/testsuite/gas/bpf/mem.d
++++ b/gas/testsuite/gas/bpf/mem.d
+@@ -11,26 +11,24 @@ Disassembly of section .text:
+    0:	20 00 00 00 ef be 00 00 	ldabsw 0xbeef
+    8:	28 00 00 00 ef be 00 00 	ldabsh 0xbeef
+   10:	30 00 00 00 ef be 00 00 	ldabsb 0xbeef
+-  18:	38 00 00 00 ef be 00 00 	ldabsdw 0xbeef
+-  20:	40 30 00 00 ef be 00 00 	ldindw %r3,0xbeef
+-  28:	48 50 00 00 ef be 00 00 	ldindh %r5,0xbeef
+-  30:	50 70 00 00 ef be 00 00 	ldindb %r7,0xbeef
+-  38:	58 90 00 00 ef be 00 00 	ldinddw %r9,0xbeef
+-  40:	61 12 ef 7e 00 00 00 00 	ldxw %r2,\[%r1\+0x7eef\]
+-  48:	69 12 ef 7e 00 00 00 00 	ldxh %r2,\[%r1\+0x7eef\]
+-  50:	71 12 ef 7e 00 00 00 00 	ldxb %r2,\[%r1\+0x7eef\]
+-  58:	79 12 fe ff 00 00 00 00 	ldxdw %r2,\[%r1\+0xfffe\]
+-  60:	63 21 ef 7e 00 00 00 00 	stxw \[%r1\+0x7eef\],%r2
+-  68:	6b 21 ef 7e 00 00 00 00 	stxh \[%r1\+0x7eef\],%r2
+-  70:	73 21 ef 7e 00 00 00 00 	stxb \[%r1\+0x7eef\],%r2
+-  78:	7b 21 fe ff 00 00 00 00 	stxdw \[%r1\+0xfffe\],%r2
+-  80:	72 01 ef 7e 44 33 22 11 	stb \[%r1\+0x7eef\],0x11223344
+-  88:	6a 01 ef 7e 44 33 22 11 	sth \[%r1\+0x7eef\],0x11223344
+-  90:	62 01 ef 7e 44 33 22 11 	stw \[%r1\+0x7eef\],0x11223344
+-  98:	7a 01 fe ff 44 33 22 11 	stdw \[%r1\+0xfffe\],0x11223344
+-  a0:	81 12 ef 7e 00 00 00 00 	ldxsw %r2,\[%r1\+0x7eef\]
+-  a8:	89 12 ef 7e 00 00 00 00 	ldxsh %r2,\[%r1\+0x7eef\]
+-  b0:	91 12 ef 7e 00 00 00 00 	ldxsb %r2,\[%r1\+0x7eef\]
+-  b8:	99 12 ef 7e 00 00 00 00 	ldxsdw %r2,\[%r1\+0x7eef\]
+-  c0:	79 12 00 00 00 00 00 00 	ldxdw %r2,\[%r1\+0x0\]
+-  c8:	40 30 00 00 00 00 00 00 	ldindw %r3,0x0
++  18:	40 30 00 00 ef be 00 00 	ldindw %r3,0xbeef
++  20:	48 50 00 00 ef be 00 00 	ldindh %r5,0xbeef
++  28:	50 70 00 00 ef be 00 00 	ldindb %r7,0xbeef
++  30:	61 12 ef 7e 00 00 00 00 	ldxw %r2,\[%r1\+0x7eef\]
++  38:	69 12 ef 7e 00 00 00 00 	ldxh %r2,\[%r1\+0x7eef\]
++  40:	71 12 ef 7e 00 00 00 00 	ldxb %r2,\[%r1\+0x7eef\]
++  48:	79 12 fe ff 00 00 00 00 	ldxdw %r2,\[%r1\+0xfffe\]
++  50:	63 21 ef 7e 00 00 00 00 	stxw \[%r1\+0x7eef\],%r2
++  58:	6b 21 ef 7e 00 00 00 00 	stxh \[%r1\+0x7eef\],%r2
++  60:	73 21 ef 7e 00 00 00 00 	stxb \[%r1\+0x7eef\],%r2
++  68:	7b 21 fe ff 00 00 00 00 	stxdw \[%r1\+0xfffe\],%r2
++  70:	72 01 ef 7e 44 33 22 11 	stb \[%r1\+0x7eef\],0x11223344
++  78:	6a 01 ef 7e 44 33 22 11 	sth \[%r1\+0x7eef\],0x11223344
++  80:	62 01 ef 7e 44 33 22 11 	stw \[%r1\+0x7eef\],0x11223344
++  88:	7a 01 fe ff 44 33 22 11 	stdw \[%r1\+0xfffe\],0x11223344
++  90:	81 12 ef 7e 00 00 00 00 	ldxsw %r2,\[%r1\+0x7eef\]
++  98:	89 12 ef 7e 00 00 00 00 	ldxsh %r2,\[%r1\+0x7eef\]
++  a0:	91 12 ef 7e 00 00 00 00 	ldxsb %r2,\[%r1\+0x7eef\]
++  a8:	99 12 ef 7e 00 00 00 00 	ldxsdw %r2,\[%r1\+0x7eef\]
++  b0:	79 12 00 00 00 00 00 00 	ldxdw %r2,\[%r1\+0x0\]
++  b8:	40 30 00 00 00 00 00 00 	ldindw %r3,0x0
+diff --git a/gas/testsuite/gas/bpf/mem.s b/gas/testsuite/gas/bpf/mem.s
+index adeda473bb8..1a10b595af0 100644
+--- a/gas/testsuite/gas/bpf/mem.s
++++ b/gas/testsuite/gas/bpf/mem.s
+@@ -5,11 +5,9 @@
+  	ldabsw 0xbeef
+ 	ldabsh 0xbeef
+  	ldabsb 0xbeef
+- 	ldabsdw 0xbeef
+ 	ldindw %r3, 0xbeef
+  	ldindh %r5, 0xbeef
+  	ldindb %r7, 0xbeef
+- 	ldinddw %r9, 0xbeef
+  	ldxw %r2, [%r1+0x7eef]
+  	ldxh %r2, [%r1+0x7eef]
+  	ldxb %r2, [%r1+0x7eef]
+diff --git a/include/opcode/bpf.h b/include/opcode/bpf.h
+index 61f1ec8a079..df1e3bd0918 100644
+--- a/include/opcode/bpf.h
++++ b/include/opcode/bpf.h
+@@ -188,9 +188,9 @@ enum bpf_insn_id
+   BPF_INSN_ENDLE16, BPF_INSN_ENDLE32, BPF_INSN_ENDLE64,
+   BPF_INSN_ENDBE16, BPF_INSN_ENDBE32, BPF_INSN_ENDBE64,
+   /* Absolute load instructions.  */
+-  BPF_INSN_LDABSB, BPF_INSN_LDABSH, BPF_INSN_LDABSW, BPF_INSN_LDABSDW,
++  BPF_INSN_LDABSB, BPF_INSN_LDABSH, BPF_INSN_LDABSW,
+   /* Indirect load instructions.  */
+-  BPF_INSN_LDINDB, BPF_INSN_LDINDH, BPF_INSN_LDINDW, BPF_INSN_LDINDDW,
++  BPF_INSN_LDINDB, BPF_INSN_LDINDH, BPF_INSN_LDINDW,
+   /* Generic load instructions (to register.)  */
+   BPF_INSN_LDXB, BPF_INSN_LDXH, BPF_INSN_LDXW, BPF_INSN_LDXDW,
+   /* Generic signed load instructions.  */
+diff --git a/opcodes/bpf-opc.c b/opcodes/bpf-opc.c
+index 750d048aae3..19e096501a2 100644
+--- a/opcodes/bpf-opc.c
++++ b/opcodes/bpf-opc.c
+@@ -198,8 +198,6 @@ const struct bpf_opcode bpf_opcodes[] =
+    BPF_V1, BPF_CODE, BPF_CLASS_LD|BPF_SIZE_H|BPF_MODE_IND},
+   {BPF_INSN_LDINDW, "ldindw%W%sr , %i32", "r0 = * ( u32 * ) skb [ %sr %I32 ]",
+    BPF_V1, BPF_CODE, BPF_CLASS_LD|BPF_SIZE_W|BPF_MODE_IND},
+-  {BPF_INSN_LDINDDW, "ldinddw%W%sr , %i32", "r0 = * ( u64 * ) skb [ %sr %I32 ]",
+-   BPF_V1, BPF_CODE, BPF_CLASS_LD|BPF_SIZE_DW|BPF_MODE_IND},
+ 
+   /* Absolute load instructions, designed to be used in socket filters.  */
+   {BPF_INSN_LDABSB, "ldabsb%W%i32", "r0 = * ( u8 * ) skb [ %i32 ]",
+@@ -208,8 +206,6 @@ const struct bpf_opcode bpf_opcodes[] =
+    BPF_V1, BPF_CODE, BPF_CLASS_LD|BPF_SIZE_H|BPF_MODE_ABS},
+   {BPF_INSN_LDABSW, "ldabsw%W%i32", "r0 = * ( u32 * ) skb [ %i32 ]",
+    BPF_V1, BPF_CODE, BPF_CLASS_LD|BPF_SIZE_W|BPF_MODE_ABS},
+-  {BPF_INSN_LDABSDW, "ldabsdw%W%i32", "r0 = * ( u64 * ) skb [ %i32 ]",
+-   BPF_V1, BPF_CODE, BPF_CLASS_LD|BPF_SIZE_DW|BPF_MODE_ABS},
+ 
+   /* Generic load instructions (to register.)  */
+   {BPF_INSN_LDXB, "ldxb%W%dr , [ %sr %o16 ]", "%dr = * ( u8 * ) ( %sr %o16 )",

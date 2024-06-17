@@ -26,10 +26,14 @@ import sys
 ################################################################################
 
 ignored_regressions = {
-    'gprofng.display/gp-collect-app_F.exp': ('tmpdir/gp-collect-app_F', ),
-    'gprofng.display/display.exp': ('synprog', ),
+    'gprofng.display/gp-collect-app_F.exp': ('tmpdir/gp-collect-app_F',),
+    'gprofng.display/display.exp': ('synprog',),
     'ld-bootstrap/bootstrap.exp':  ('*',),
+    'ld-ifunc/ifunc.exp':  ('Run pr18841 with libpr18841c.so', 'Run pr18841 with libpr18841cn.so (-z now)'),
+    'ld-loongarch-elf/pic.exp':  ('nopic link exec test',),
+    'ld-x86-64/x86-64.exp':  ('*',),
     }
+ignored_regressions = {}
 
 def ignore_regression(section, test):
     ign_tests = ignored_regressions.get(section)
