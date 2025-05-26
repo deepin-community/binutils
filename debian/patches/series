@@ -174,3 +174,5 @@ replace-space-with-tab.patch
 LoongArch-binutils-compatible-with-older-gcc.diff
 LoongArch-remove-test-cases-for-compatibility.patch
 PR32238-ld-r-slowdown-since-21401fc7bf.patch
+0001-deepin-sw_64-bintuils.diff
+0002-deepin-add-sw-64-targe.diff

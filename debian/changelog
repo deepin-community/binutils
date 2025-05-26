@@ -1,3 +1,9 @@
+binutils (2.41-6deepin8) unstable; urgency=medium
+
+  * feat: add sw64 support
+
+ -- Deepin Packages Builder <packages@deepin.org>  Mon, 26 May 2025 10:28:38 +0800
+
 binutils (2.41-6deepin7) unstable; urgency=medium
 
   * Fix slowdown about partial linking.
