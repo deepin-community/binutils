@@ -1,0 +1,151 @@
+From 0de08292f8bf1ad019e86d2ab7f942f44e0d5f9e Mon Sep 17 00:00:00 2001
+From: Alan Modra <amodra@gmail.com>
+Date: Tue, 10 Jun 2025 20:29:33 +0930
+Subject: [PATCH 09/12] loongarch gcc-4.5 build fixes
+
+Yet another case of missing fields in struct initialisation, which
+I've replaced with a memset, and some complaints about identifiers
+shadowing global declarations.  Fixing the shadowing in
+loongarch-parse.y is easy.  This one isn't so easy:
+gas/expr.c: In function 'expr':
+gas/expr.c:1891:12: error: declaration of 'is_unsigned' shadows a global declaration
+include/opcode/loongarch.h:224:14: error: shadowed declaration is here
+
+opcode/loongarch.h declares lots of stuff that shouldn't be made
+available to generic gas code, so I've removed that header from
+tc-loongarch.h and moved the parts of TC_FORCE_RELOCATION_SUB_LOCAL
+and TC_FORCE_RELOCATION_SUB_LOCAL that need LARCH_opts to functions
+in tc-loongarch.c
+
+	* config/loongarch-parse.y (loongarch_parse_expr): Rename
+        param to avoid shadowing.
+	* config/tc-loongarch.c (loongarch_assemble_INSNs): Use memset
+	rather than struct initialisation.
+	(loongarch_force_relocation_sub_local): New function.
+	(loongarch_force_relocation_sub_same): Likewise.
+	* config/tc-loongarch.h: Don't include opcode/loongarch.h.
+	(loongarch_force_relocation_sub_local): Declare, and..
+	(TC_FORCE_RELOCATION_SUB_LOCAL): ..use here.
+	(loongarch_force_relocation_sub_same): Declare, and..
+	(TC_FORCE_RELOCATION_SUB_SAME): ..use here.
+---
+ gas/config/loongarch-parse.y |  4 ++--
+ gas/config/tc-loongarch.c    | 26 +++++++++++++++++++++++++-
+ gas/config/tc-loongarch.h    | 21 ++++++---------------
+ 3 files changed, 33 insertions(+), 18 deletions(-)
+
+diff --git a/gas/config/loongarch-parse.y b/gas/config/loongarch-parse.y
+index dbb49800..960e0997 100644
+--- a/gas/config/loongarch-parse.y
++++ b/gas/config/loongarch-parse.y
+@@ -42,7 +42,7 @@ is_const (struct reloc_info *info)
+ }
+ 
+ int
+-loongarch_parse_expr (const char *expr,
++loongarch_parse_expr (const char *exp,
+ 		      struct reloc_info *reloc_stack_top,
+ 		      size_t max_reloc_num,
+ 		      size_t *reloc_num,
+@@ -52,7 +52,7 @@ loongarch_parse_expr (const char *expr,
+   struct yy_buffer_state *buffstate;
+   top = reloc_stack_top;
+   end = top + max_reloc_num;
+-  buffstate = yy_scan_string (expr);
++  buffstate = yy_scan_string (exp);
+   ret = yyparse ();
+ 
+   if (ret == 0)
+diff --git a/gas/config/tc-loongarch.c b/gas/config/tc-loongarch.c
+index cc733675..1d13cbb6 100644
+--- a/gas/config/tc-loongarch.c
++++ b/gas/config/tc-loongarch.c
+@@ -1392,7 +1392,8 @@ loongarch_assemble_INSNs (char *str, unsigned int expand_from_macro)
+       if (*str == '\0')
+ 	break;
+ 
+-      struct loongarch_cl_insn the_one = { 0 };
++      struct loongarch_cl_insn the_one;
++      memset (&the_one, 0, sizeof (the_one));
+       the_one.name = str;
+       the_one.expand_from_macro = expand_from_macro;
+ 
+@@ -1493,6 +1494,29 @@ loongarch_force_relocation (struct fix *fixp)
+   return generic_force_reloc (fixp);
+ }
+ 
++/* If subsy of BFD_RELOC32/64 and PC in same segment, and without relax
++   or PC at start of subsy or with relax but sub_symbol_segment not in
++   SEC_CODE, we generate 32/64_PCREL.  */
++bool
++loongarch_force_relocation_sub_local (fixS *fixp, segT sec ATTRIBUTE_UNUSED)
++{
++  return !(LARCH_opts.thin_add_sub
++	   && (fixp->fx_r_type == BFD_RELOC_32
++	       || fixp->fx_r_type == BFD_RELOC_64)
++	   && (!LARCH_opts.relax
++	       || (S_GET_VALUE (fixp->fx_subsy)
++		   == fixp->fx_frag->fr_address + fixp->fx_where)
++	       || (S_GET_SEGMENT (fixp->fx_subsy)->flags & SEC_CODE) == 0));
++}
++
++/* Postpone text-section label subtraction calculation until linking, since
++   linker relaxations might change the deltas.  */
++bool
++loongarch_force_relocation_sub_same(fixS *fixp ATTRIBUTE_UNUSED, segT sec)
++{
++  return LARCH_opts.relax && (sec->flags & SEC_CODE) != 0;
++}
++
+ static void fix_reloc_insn (fixS *fixP, bfd_vma reloc_val, char *buf)
+ {
+   reloc_howto_type *howto;
+diff --git a/gas/config/tc-loongarch.h b/gas/config/tc-loongarch.h
+index da8b0547..5511946f 100644
+--- a/gas/config/tc-loongarch.h
++++ b/gas/config/tc-loongarch.h
+@@ -21,8 +21,6 @@
+ #ifndef TC_LOONGARCH
+ #define TC_LOONGARCH
+ 
+-#include "opcode/loongarch.h"
+-
+ #define TARGET_BYTES_BIG_ENDIAN 0
+ #define TARGET_ARCH bfd_arch_loongarch
+ 
+@@ -80,26 +78,19 @@ extern int loongarch_force_relocation (struct fix *);
+ /* If subsy of BFD_RELOC32/64 and PC in same segment, and without relax
+    or PC at start of subsy or with relax but sub_symbol_segment not in
+    SEC_CODE, we generate 32/64_PCREL.  */
+-#define TC_FORCE_RELOCATION_SUB_LOCAL(FIX, SEG) \
+-  (!(LARCH_opts.thin_add_sub \
+-     && ((FIX)->fx_r_type == BFD_RELOC_32 \
+-	 ||(FIX)->fx_r_type == BFD_RELOC_64) \
+-     && (!LARCH_opts.relax \
+-	|| S_GET_VALUE (FIX->fx_subsy) \
+-	   == FIX->fx_frag->fr_address + FIX->fx_where \
+-	|| (LARCH_opts.relax \
+-	   && ((S_GET_SEGMENT (FIX->fx_subsy)->flags & SEC_CODE) == 0)))))
++extern bool loongarch_force_relocation_sub_local (struct fix *, asection *);
++#define TC_FORCE_RELOCATION_SUB_LOCAL(FIX, SEC) \
++  loongarch_force_relocation_sub_local (FIX, SEC)
+ 
+ #define TC_VALIDATE_FIX_SUB(FIX, SEG) 1
+ #define DIFF_EXPR_OK 1
+ 
+ /* Postpone text-section label subtraction calculation until linking, since
+    linker relaxations might change the deltas.  */
++extern bool loongarch_force_relocation_sub_same(struct fix *, asection *);
+ #define TC_FORCE_RELOCATION_SUB_SAME(FIX, SEC)	\
+-  (LARCH_opts.relax ?  \
+-    (GENERIC_FORCE_RELOCATION_SUB_SAME (FIX, SEC)	\
+-      || ((SEC)->flags & SEC_CODE) != 0)		\
+-    : (GENERIC_FORCE_RELOCATION_SUB_SAME (FIX, SEC))) \
++  (loongarch_force_relocation_sub_same (FIX, SEC) \
++   || GENERIC_FORCE_RELOCATION_SUB_SAME (FIX, SEC))
+ 
+ #define TC_LINKRELAX_FIXUP(seg) ((seg->flags & SEC_CODE)  \
+ 				    || (seg->flags & SEC_DEBUGGING))
+-- 
+2.47.3
+

@@ -1,0 +1,99 @@
+From e49f5021d14cd5c0209249f24bd5a9a7cae9e2d5 Mon Sep 17 00:00:00 2001
+From: Lulu Cai <cailulu@loongson.cn>
+Date: Tue, 26 Aug 2025 17:19:47 +0800
+Subject: [PATCH 4/6] LoongArch: Fix incorrect display of FDEs address ranges
+ when using objdump -Wf
+
+When parsing FDEs in `.eh_frame` using `objdump -Wf`, it is necessary to
+resolve `BFD_RELOC_LARCH_32_PCREL` to determine the address ranges of
+the FDEs. Set the `pcrel_offset` field of `BFD_RELOC_LARCH_32_PCREL` to
+help `objdump` correctly compute the address ranges of the FDEs.
+
+Apply the same modification to BFD_RELOC_LARCH_64_PCREL.
+---
+ bfd/elfxx-loongarch.c                  |  4 ++--
+ gas/testsuite/gas/loongarch/frame_pc.d | 22 ++++++++++++++++++++++
+ gas/testsuite/gas/loongarch/frame_pc.s | 20 ++++++++++++++++++++
+ 3 files changed, 44 insertions(+), 2 deletions(-)
+ create mode 100644 gas/testsuite/gas/loongarch/frame_pc.d
+ create mode 100644 gas/testsuite/gas/loongarch/frame_pc.s
+
+diff --git a/bfd/elfxx-loongarch.c b/bfd/elfxx-loongarch.c
+index 83b4ee64..25f1b71c 100644
+--- a/bfd/elfxx-loongarch.c
++++ b/bfd/elfxx-loongarch.c
+@@ -1388,7 +1388,7 @@ static loongarch_reloc_howto_type loongarch_howto_table[] =
+ 	 false,					/* partial_inplace.  */
+ 	 0,					/* src_mask */
+ 	 0xffffffff,				/* dst_mask */
+-	 false,					/* pcrel_offset */
++	 true,					/* pcrel_offset */
+ 	 BFD_RELOC_LARCH_32_PCREL,		/* bfd_reloc_code_real_type */
+ 	 NULL,					/* adjust_reloc_bits */
+ 	 NULL),					/* larch_reloc_type_name */
+@@ -1580,7 +1580,7 @@ static loongarch_reloc_howto_type loongarch_howto_table[] =
+ 	 false,					/* partial_inplace.  */
+ 	 0,					/* src_mask */
+ 	 0xffffffffffffffff,			/* dst_mask */
+-	 false,					/* pcrel_offset */
++	 true,					/* pcrel_offset */
+ 	 BFD_RELOC_LARCH_64_PCREL,		/* bfd_reloc_code_real_type */
+ 	 NULL,					/* adjust_reloc_bits */
+ 	 NULL),					/* larch_reloc_type_name */
+diff --git a/gas/testsuite/gas/loongarch/frame_pc.d b/gas/testsuite/gas/loongarch/frame_pc.d
+new file mode 100644
+index 00000000..7bd862ba
+--- /dev/null
++++ b/gas/testsuite/gas/loongarch/frame_pc.d
+@@ -0,0 +1,22 @@
++#objdump: -Wf -d -M no-aliases
++#skip: loongarch32-*-*
++
++.*:     file format .*
++
++Contents of the .eh_frame section:
++#...
++00000014 0000000000000020 00000018 FDE cie=00000000 pc=0000000000000000..0000000000000020
++  DW_CFA_advance_loc: 4 to 0000000000000004
++#...
++
++Disassembly of section .text:
++
++0+0 <_start>:
++   0:	02ffc063 	addi.d      	\$sp, \$sp, -16
++   4:	29c02076 	st.d        	\$fp, \$sp, 8
++   8:	02c04076 	addi.d      	\$fp, \$sp, 16
++   c:	0015000c 	or          	\$t0, \$zero, \$zero
++  10:	00150184 	or          	\$a0, \$t0, \$zero
++  14:	28c02076 	ld.d        	\$fp, \$sp, 8
++  18:	02c04063 	addi.d      	\$sp, \$sp, 16
++  1c:	4c000020 	jirl        	\$zero, \$ra, 0
+diff --git a/gas/testsuite/gas/loongarch/frame_pc.s b/gas/testsuite/gas/loongarch/frame_pc.s
+new file mode 100644
+index 00000000..8344d737
+--- /dev/null
++++ b/gas/testsuite/gas/loongarch/frame_pc.s
+@@ -0,0 +1,20 @@
++	.align	2
++	.globl	_start
++	.type	_start, @function
++_start:
++	.cfi_startproc
++	addi.d	$sp,$sp,-16
++	.cfi_def_cfa_offset 16
++	st.d	$fp,$sp,8
++	.cfi_offset 22, -8
++	addi.d	$fp,$sp,16
++	.cfi_def_cfa 22, 0
++	or	$t0,$zero,$zero
++	or	$a0,$t0,$zero
++	ld.d	$fp,$sp,8
++	.cfi_restore 22
++	addi.d	$sp,$sp,16
++	.cfi_def_cfa_register 3
++	jr	$ra
++	.cfi_endproc
++	.size	_start, .-_start
+-- 
+2.43.7
+

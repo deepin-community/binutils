@@ -1,0 +1,32 @@
+From b040b922dea959eb2e9e08ad6c99416680730ebc Mon Sep 17 00:00:00 2001
+From: lijian1 <lijian1@kylinos.cn>
+Date: Mon, 24 Nov 2025 15:53:50 +0800
+Subject: [PATCH 6/6] LoongArch: set PRSTATUS_SIZE=0x1e0 to match kernel's
+ struct elf_prstatus size
+
+As PRSTATUS_SIZE is now with the value 0x1d8, which causes inconsistency with the kernel
+definition and then can not lead to the correct branch for loongarch64 backend.
+
+With the correct value 0x1e0 for the master branch, the loongarch64 banckend will work well.
+
+Signed-off-by: Li Jian <lijian1@kylinos.cn>
+---
+ bfd/elfnn-loongarch.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/bfd/elfnn-loongarch.c b/bfd/elfnn-loongarch.c
+index 1a746b92..d7120d0e 100644
+--- a/bfd/elfnn-loongarch.c
++++ b/bfd/elfnn-loongarch.c
+@@ -6486,7 +6486,7 @@ loongarch_elf_copy_indirect_symbol (struct bfd_link_info *info,
+   _bfd_elf_link_hash_copy_indirect (info, dir, ind);
+ }
+ 
+-#define PRSTATUS_SIZE		    0x1d8
++#define PRSTATUS_SIZE		    0x1e0
+ #define PRSTATUS_OFFSET_PR_CURSIG   0xc
+ #define PRSTATUS_OFFSET_PR_PID	    0x20
+ #define ELF_GREGSET_T_SIZE	    0x168
+-- 
+2.43.7
+

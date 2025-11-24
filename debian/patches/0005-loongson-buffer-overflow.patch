@@ -1,0 +1,32 @@
+From b59e3612808c69d8032d5aba1c639d33f4053a09 Mon Sep 17 00:00:00 2001
+From: Alan Modra <amodra@gmail.com>
+Date: Sun, 26 Jan 2025 13:12:45 +1030
+Subject: [PATCH 05/12] loongson buffer overflow
+
+bfd_elfNN_loongarch_set_data_segment_info can be called from the target
+after_allocation function with a non-ELF hash table.  This is seen in
+the ld-elf pr21884 testcase.  Fix the problem by first checking the
+hash table type before writing to a loongarch_elf_hash_table field.
+---
+ bfd/elfnn-loongarch.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/bfd/elfnn-loongarch.c b/bfd/elfnn-loongarch.c
+index 12108476..e42c8088 100644
+--- a/bfd/elfnn-loongarch.c
++++ b/bfd/elfnn-loongarch.c
+@@ -5159,8 +5159,9 @@ void
+ bfd_elfNN_loongarch_set_data_segment_info (struct bfd_link_info *info,
+ 				     int *data_segment_phase)
+ {
+-  struct loongarch_elf_link_hash_table *htab = loongarch_elf_hash_table (info);
+-  htab->data_segment_phase = data_segment_phase;
++  if (is_elf_hash_table (info->hash)
++      && elf_hash_table_id (elf_hash_table (info)) == LARCH_ELF_DATA)
++    loongarch_elf_hash_table (info)->data_segment_phase = data_segment_phase;
+ }
+ 
+ /* Implement R_LARCH_ALIGN by deleting excess alignment NOPs.
+-- 
+2.47.3
+
