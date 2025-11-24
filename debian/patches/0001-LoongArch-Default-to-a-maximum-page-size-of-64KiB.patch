@@ -1,0 +1,161 @@
+From 4b10a30d6d02675892fd0220fa1d722d9f342359 Mon Sep 17 00:00:00 2001
+From: WANG Xuerui <git@xen0n.name>
+Date: Sat, 19 Oct 2024 22:11:52 +0800
+Subject: [PATCH 01/12] LoongArch: Default to a maximum page size of 64KiB
+
+As per the spec (Section 7.5.10, LoongArch Reference Manual Vol. 1),
+LoongArch machines are not limited in page size choices, and currently
+page sizes of 4KiB, 16KiB and 64KiB are supported by mainline Linux.
+While 16KiB is the most common, the current BFD code says it is the
+maximum; this is not correct, and as an effect, almost all existing
+binaries are incompatible with a 64KiB kernel because the sections are
+not sufficiently aligned, while being totally fine otherwise.
+This is needlessly complicating integration testing [1].
+
+This patch fixes the inconsistency, and also brings BFD behavior in line
+with that of LLD [2].
+
+[1] https://github.com/loongson-community/discussions/issues/47
+[2] https://github.com/llvm/llvm-project/blob/llvmorg-19.1.0/lld/ELF/Arch/LoongArch.cpp#L174-L183
+
+bfd/
+	* elfnn-loongarch.c (ELF_MAXPAGESIZE): Bump to 64KiB.
+	(ELF_MINPAGESIZE): Define as 4KiB.
+	(ELF_COMMONPAGESIZE): Define as 16KiB.
+
+ld/
+	* testsuite/ld-loongarch-elf/64_pcrel.d: Update assertions after
+	changing the target max page size to 64KiB.
+	* testsuite/ld-loongarch-elf/data-got.d: Likewise.
+	* testsuite/ld-loongarch-elf/desc-relex.d: Likewise.
+	* testsuite/ld-loongarch-elf/relax-align-ignore-start.d: Likewise.
+	* testsuite/ld-loongarch-elf/tlsdesc_abs.d: Make the fuzzy match work
+	as intended by not checking exact instruction words.
+	* testsuite/ld-loongarch-elf/tlsdesc_extreme.d: Likewise.
+
+Signed-off-by: WANG Xuerui <git@xen0n.name>
+---
+ bfd/elfnn-loongarch.c                                |  4 +++-
+ ld/testsuite/ld-loongarch-elf/64_pcrel.d             |  2 +-
+ ld/testsuite/ld-loongarch-elf/data-got.d             |  2 +-
+ ld/testsuite/ld-loongarch-elf/desc-relax.d           |  2 +-
+ .../ld-loongarch-elf/relax-align-ignore-start.d      |  2 +-
+ ld/testsuite/ld-loongarch-elf/tlsdesc_abs.d          | 12 ++++++------
+ ld/testsuite/ld-loongarch-elf/tlsdesc_extreme.d      |  8 ++++----
+ 7 files changed, 17 insertions(+), 15 deletions(-)
+
+diff --git a/bfd/elfnn-loongarch.c b/bfd/elfnn-loongarch.c
+index 13216ef9..8dfb5ea1 100644
+--- a/bfd/elfnn-loongarch.c
++++ b/bfd/elfnn-loongarch.c
+@@ -6171,7 +6171,9 @@ elf_loongarch64_hash_symbol (struct elf_link_hash_entry *h)
+ #define ELF_ARCH bfd_arch_loongarch
+ #define ELF_TARGET_ID LARCH_ELF_DATA
+ #define ELF_MACHINE_CODE EM_LOONGARCH
+-#define ELF_MAXPAGESIZE 0x4000
++#define ELF_MINPAGESIZE 0x1000
++#define ELF_MAXPAGESIZE 0x10000
++#define ELF_COMMONPAGESIZE 0x4000
+ #define bfd_elfNN_bfd_reloc_type_lookup loongarch_reloc_type_lookup
+ #define bfd_elfNN_bfd_link_hash_table_create				  \
+   loongarch_elf_link_hash_table_create
+diff --git a/ld/testsuite/ld-loongarch-elf/64_pcrel.d b/ld/testsuite/ld-loongarch-elf/64_pcrel.d
+index 2ea063b7..1f4664ea 100644
+--- a/ld/testsuite/ld-loongarch-elf/64_pcrel.d
++++ b/ld/testsuite/ld-loongarch-elf/64_pcrel.d
+@@ -1,4 +1,4 @@
+ #...
+-.*0xffffbffc.*
++.*0xfffefffc.*
+ .*0xffffffff.*
+ #pass
+diff --git a/ld/testsuite/ld-loongarch-elf/data-got.d b/ld/testsuite/ld-loongarch-elf/data-got.d
+index a754478a..4a26c72d 100644
+--- a/ld/testsuite/ld-loongarch-elf/data-got.d
++++ b/ld/testsuite/ld-loongarch-elf/data-got.d
+@@ -8,7 +8,7 @@
+ #skip: loongarch32-*-*
+ 
+ #...
+-  GNU_RELRO      0x003c10 0x0000000000007c10 0x0000000000007c10 0x0003f0 0x0003f0 R   0x1
++  GNU_RELRO      0x00fc10 0x000000000001fc10 0x000000000001fc10 0x0003f0 0x0003f0 R   0x1
+ #...
+    01     .dynamic .got .got.plt .data 
+ #...
+diff --git a/ld/testsuite/ld-loongarch-elf/desc-relax.d b/ld/testsuite/ld-loongarch-elf/desc-relax.d
+index c885953c..48f2d1e3 100644
+--- a/ld/testsuite/ld-loongarch-elf/desc-relax.d
++++ b/ld/testsuite/ld-loongarch-elf/desc-relax.d
+@@ -9,7 +9,7 @@
+ Disassembly of section .text:
+ 
+ 0+188 <.*>:
+- 188:	18020844 	pcaddi      	\$a0, 4162
++ 188:	18080844 	pcaddi      	\$a0, 16450
+  18c:	28c00081 	ld.d        	\$ra, \$a0, 0
+  190:	4c000021 	jirl        	\$ra, \$ra, 0
+  194:	0010888c 	add.d       	\$t0, \$a0, \$tp
+diff --git a/ld/testsuite/ld-loongarch-elf/relax-align-ignore-start.d b/ld/testsuite/ld-loongarch-elf/relax-align-ignore-start.d
+index 939cf427..70763ff0 100644
+--- a/ld/testsuite/ld-loongarch-elf/relax-align-ignore-start.d
++++ b/ld/testsuite/ld-loongarch-elf/relax-align-ignore-start.d
+@@ -12,5 +12,5 @@ Disassembly of section bbb:
+ 0000000120000080 <bbb>:
+ [ 	]+120000080:[ 	]+4c000020[ 	]+ret
+ Disassembly of section ccc:
+-0000000120000090 <__bss_start-0x4004>:
++0000000120000090 <__bss_start-0x10004>:
+ [ 	]+120000090:[ 	]+4c000020[ 	]+ret
+diff --git a/ld/testsuite/ld-loongarch-elf/tlsdesc_abs.d b/ld/testsuite/ld-loongarch-elf/tlsdesc_abs.d
+index 62f5a2a0..7e23454b 100644
+--- a/ld/testsuite/ld-loongarch-elf/tlsdesc_abs.d
++++ b/ld/testsuite/ld-loongarch-elf/tlsdesc_abs.d
+@@ -9,15 +9,15 @@
+ Disassembly of section .text:
+ 
+ 0+120000100 <.*>:
+-   120000100:	14400084 	lu12i.w     	\$a0, .*
+-   120000104:	03850084 	ori         	\$a0, \$a0, .*
+-   120000108:	16000024 	lu32i.d     	\$a0, .*
++   120000100:	........ 	lu12i.w     	\$a0, .*
++   120000104:	........ 	ori         	\$a0, \$a0, .*
++   120000108:	........ 	lu32i.d     	\$a0, .*
+    12000010c:	03000084 	lu52i.d     	\$a0, \$a0, 0
+    120000110:	28c00081 	ld.d        	\$ra, \$a0, 0
+    120000114:	4c000021 	jirl        	\$ra, \$ra, 0
+-   120000118:	14400084 	lu12i.w     	\$a0, .*
+-   12000011c:	03850084 	ori         	\$a0, \$a0, .*
+-   120000120:	16000024 	lu32i.d     	\$a0, .*
++   120000118:	........ 	lu12i.w     	\$a0, .*
++   12000011c:	........ 	ori         	\$a0, \$a0, .*
++   120000120:	........ 	lu32i.d     	\$a0, .*
+    120000124:	03000084 	lu52i.d     	\$a0, \$a0, 0
+    120000128:	28c00081 	ld.d        	\$ra, \$a0, 0
+    12000012c:	4c000021 	jirl        	\$ra, \$ra, 0
+diff --git a/ld/testsuite/ld-loongarch-elf/tlsdesc_extreme.d b/ld/testsuite/ld-loongarch-elf/tlsdesc_extreme.d
+index 55179997..fbc1d945 100644
+--- a/ld/testsuite/ld-loongarch-elf/tlsdesc_extreme.d
++++ b/ld/testsuite/ld-loongarch-elf/tlsdesc_extreme.d
+@@ -9,15 +9,15 @@
+ Disassembly of section .text:
+ 
+ 0+120000100 <.*>:
+-   120000100:	1a000084 	pcalau12i   	\$a0, .*
+-   120000104:	02c52001 	li.d        	\$ra, .*
++   120000100:	........ 	pcalau12i   	\$a0, .*
++   120000104:	........ 	li.d        	\$ra, .*
+    120000108:	16000001 	lu32i.d     	\$ra, 0
+    12000010c:	03000021 	lu52i.d     	\$ra, \$ra, 0
+    120000110:	00108484 	add.d       	\$a0, \$a0, \$ra
+    120000114:	28c00081 	ld.d        	\$ra, \$a0, 0
+    120000118:	4c000021 	jirl        	\$ra, \$ra, 0
+-   12000011c:	1a000084 	pcalau12i   	\$a0, .*
+-   120000120:	02c5200d 	li.d        	\$t1, .*
++   12000011c:	........ 	pcalau12i   	\$a0, .*
++   120000120:	........ 	li.d        	\$t1, .*
+    120000124:	1600000d 	lu32i.d     	\$t1, 0
+    120000128:	030001ad 	lu52i.d     	\$t1, \$t1, 0
+    12000012c:	0010b484 	add.d       	\$a0, \$a0, \$t1
+-- 
+2.47.3
+

@@ -1,0 +1,207 @@
+From d63d442331671ff2e1a747d0d4bcf58d3cbe8802 Mon Sep 17 00:00:00 2001
+From: Lulu Cai <cailulu@loongson.cn>
+Date: Mon, 30 Sep 2024 16:08:59 +0800
+Subject: [PATCH 02/12] LoongArch: Check PC-relative relocations for shared
+ libraries
+
+Building shared libraries should not be allowed for PC-relative
+relocations against external symbols.
+Currently LoongArch has no corresponding checks and silently
+generates wrong shared libraries.
+
+However, In the first version of the medium cmodel, pcalau12i+jirl was
+used for function calls, in which case PC-relative relocations were
+allowed.
+---
+ bfd/elfnn-loongarch.c                         | 21 +++++++++++++++++++
+ .../ld-loongarch-elf/bad_pcala_hi20_global.d  |  5 +++++
+ .../ld-loongarch-elf/bad_pcala_hi20_global.s  |  8 +++++++
+ .../ld-loongarch-elf/bad_pcala_hi20_weak.d    |  5 +++++
+ .../ld-loongarch-elf/bad_pcala_hi20_weak.s    |  9 ++++++++
+ .../ld-loongarch-elf/bad_pcrel20_s2_global.d  |  5 +++++
+ .../ld-loongarch-elf/bad_pcrel20_s2_global.s  |  8 +++++++
+ .../ld-loongarch-elf/bad_pcrel20_s2_weak.d    |  5 +++++
+ .../ld-loongarch-elf/bad_pcrel20_s2_weak.s    |  9 ++++++++
+ ld/testsuite/ld-loongarch-elf/data-plt.s      |  1 +
+ .../ld-loongarch-elf/ld-loongarch-elf.exp     |  4 ++++
+ 11 files changed, 80 insertions(+)
+ create mode 100644 ld/testsuite/ld-loongarch-elf/bad_pcala_hi20_global.d
+ create mode 100644 ld/testsuite/ld-loongarch-elf/bad_pcala_hi20_global.s
+ create mode 100644 ld/testsuite/ld-loongarch-elf/bad_pcala_hi20_weak.d
+ create mode 100644 ld/testsuite/ld-loongarch-elf/bad_pcala_hi20_weak.s
+ create mode 100644 ld/testsuite/ld-loongarch-elf/bad_pcrel20_s2_global.d
+ create mode 100644 ld/testsuite/ld-loongarch-elf/bad_pcrel20_s2_global.s
+ create mode 100644 ld/testsuite/ld-loongarch-elf/bad_pcrel20_s2_weak.d
+ create mode 100644 ld/testsuite/ld-loongarch-elf/bad_pcrel20_s2_weak.s
+
+diff --git a/bfd/elfnn-loongarch.c b/bfd/elfnn-loongarch.c
+index 8dfb5ea1..46fd1a11 100644
+--- a/bfd/elfnn-loongarch.c
++++ b/bfd/elfnn-loongarch.c
+@@ -1079,6 +1079,18 @@ loongarch_elf_check_relocs (bfd *abfd, struct bfd_link_info *info,
+ 	    h->non_got_ref = 1;
+ 	  break;
+ 
++	/* Since shared library global symbols interpose, any
++	   PC-relative relocations against external symbols
++	   should not be used to build shared libraries.  */
++	case R_LARCH_PCREL20_S2:
++	  if (bfd_link_pic (info)
++	      && (sec->flags & SEC_ALLOC) != 0
++	      && (sec->flags & SEC_READONLY) != 0
++	      && ! LARCH_REF_LOCAL (info, h))
++	    return bad_static_reloc (abfd, rel, sec, r_type, h, NULL);
++
++	  break;
++
+ 	/* For normal cmodel, pcalau12i + addi.d/w used to data.
+ 	   For first version medium cmodel, pcalau12i + jirl are used to
+ 	   function call, it need to creat PLT entry for STT_FUNC and
+@@ -1096,6 +1108,15 @@ loongarch_elf_check_relocs (bfd *abfd, struct bfd_link_info *info,
+ 	      h->pointer_equality_needed = 1;
+ 	    }
+ 
++	  /* PC-relative relocations are allowed For first version
++	     medium cmodel function call.  */
++	  if (h != NULL && !h->needs_plt
++	      && bfd_link_pic (info)
++	      && (sec->flags & SEC_ALLOC) != 0
++	      && (sec->flags & SEC_READONLY) != 0
++	      && ! LARCH_REF_LOCAL (info, h))
++	    return bad_static_reloc (abfd, rel, sec, r_type, h, NULL);
++
+ 	  break;
+ 
+ 	case R_LARCH_B16:
+diff --git a/ld/testsuite/ld-loongarch-elf/bad_pcala_hi20_global.d b/ld/testsuite/ld-loongarch-elf/bad_pcala_hi20_global.d
+new file mode 100644
+index 00000000..6ecefd1d
+--- /dev/null
++++ b/ld/testsuite/ld-loongarch-elf/bad_pcala_hi20_global.d
+@@ -0,0 +1,5 @@
++#name: PC-relative relocation making shared
++#source: bad_pcala_hi20_global.s
++#target: [check_shared_lib_support]
++#ld: -shared --defsym global_a=0x10 --defsym global_b=0x20
++#error: .*: relocation R_LARCH_PCALA_HI20 against `global_b` can not be used when making a shared object; recompile with -fPIC
+diff --git a/ld/testsuite/ld-loongarch-elf/bad_pcala_hi20_global.s b/ld/testsuite/ld-loongarch-elf/bad_pcala_hi20_global.s
+new file mode 100644
+index 00000000..d8189e45
+--- /dev/null
++++ b/ld/testsuite/ld-loongarch-elf/bad_pcala_hi20_global.s
+@@ -0,0 +1,8 @@
++    .hidden global_a
++    .text
++    .align 2
++main:
++    # Symbols defined .hidden are bound local and
++    # the linker should differenciate them.
++    la.pcrel  $a0, global_a
++    la.pcrel  $a0, global_b
+diff --git a/ld/testsuite/ld-loongarch-elf/bad_pcala_hi20_weak.d b/ld/testsuite/ld-loongarch-elf/bad_pcala_hi20_weak.d
+new file mode 100644
+index 00000000..cefc42cf
+--- /dev/null
++++ b/ld/testsuite/ld-loongarch-elf/bad_pcala_hi20_weak.d
+@@ -0,0 +1,5 @@
++#name: PC-relative relocation making shared
++#source: bad_pcala_hi20_weak.s
++#target: [check_shared_lib_support]
++#ld: -shared --defsym global_a=0x10 --defsym global_b=0x20
++#error: .*: relocation R_LARCH_PCALA_HI20 against `global_b` can not be used when making a shared object; recompile with -fPIC
+diff --git a/ld/testsuite/ld-loongarch-elf/bad_pcala_hi20_weak.s b/ld/testsuite/ld-loongarch-elf/bad_pcala_hi20_weak.s
+new file mode 100644
+index 00000000..73c6ec5f
+--- /dev/null
++++ b/ld/testsuite/ld-loongarch-elf/bad_pcala_hi20_weak.s
+@@ -0,0 +1,9 @@
++    .hidden global_a
++    .weak   global_b
++    .text
++    .align 2
++main:
++    # Symbols defined .hidden are bound local and
++    # the linker should differenciate them.
++    la.pcrel  $a0, global_a
++    la.pcrel  $a0, global_b
+diff --git a/ld/testsuite/ld-loongarch-elf/bad_pcrel20_s2_global.d b/ld/testsuite/ld-loongarch-elf/bad_pcrel20_s2_global.d
+new file mode 100644
+index 00000000..8e063dfb
+--- /dev/null
++++ b/ld/testsuite/ld-loongarch-elf/bad_pcrel20_s2_global.d
+@@ -0,0 +1,5 @@
++#name: PC-relative relocation making shared
++#source: bad_pcrel20_s2_global.s
++#target: [check_shared_lib_support]
++#ld: -shared --defsym global_a=0x10 --defsym global_b=0x20
++#error: .*: relocation R_LARCH_PCREL20_S2 against `global_b` can not be used when making a shared object; recompile with -fPIC
+diff --git a/ld/testsuite/ld-loongarch-elf/bad_pcrel20_s2_global.s b/ld/testsuite/ld-loongarch-elf/bad_pcrel20_s2_global.s
+new file mode 100644
+index 00000000..39cedbd2
+--- /dev/null
++++ b/ld/testsuite/ld-loongarch-elf/bad_pcrel20_s2_global.s
+@@ -0,0 +1,8 @@
++    .hidden global_a
++    .text
++    .align 2
++main:
++    # Symbols defined .hidden are bound local and
++    # the linker should differenciate them.
++    pcaddi    $a0, %pcrel_20(global_a)
++    pcaddi    $a0, %pcrel_20(global_b)
+diff --git a/ld/testsuite/ld-loongarch-elf/bad_pcrel20_s2_weak.d b/ld/testsuite/ld-loongarch-elf/bad_pcrel20_s2_weak.d
+new file mode 100644
+index 00000000..605df249
+--- /dev/null
++++ b/ld/testsuite/ld-loongarch-elf/bad_pcrel20_s2_weak.d
+@@ -0,0 +1,5 @@
++#name: PC-relative relocation making shared
++#source: bad_pcrel20_s2_weak.s
++#target: [check_shared_lib_support]
++#ld: -shared --defsym global_a=0x10 --defsym global_b=0x20
++#error: .*: relocation R_LARCH_PCREL20_S2 against `global_b` can not be used when making a shared object; recompile with -fPIC
+diff --git a/ld/testsuite/ld-loongarch-elf/bad_pcrel20_s2_weak.s b/ld/testsuite/ld-loongarch-elf/bad_pcrel20_s2_weak.s
+new file mode 100644
+index 00000000..82faa5bb
+--- /dev/null
++++ b/ld/testsuite/ld-loongarch-elf/bad_pcrel20_s2_weak.s
+@@ -0,0 +1,9 @@
++    .hidden global_a
++    .weak   global_b
++    .text
++    .align 2
++main:
++    # Symbols defined .hidden are bound local and
++    # the linker should differenciate them.
++    pcaddi    $a0, %pcrel_20(global_a)
++    pcaddi    $a0, %pcrel_20(global_b)
+diff --git a/ld/testsuite/ld-loongarch-elf/data-plt.s b/ld/testsuite/ld-loongarch-elf/data-plt.s
+index faff052c..6c1a8eac 100644
+--- a/ld/testsuite/ld-loongarch-elf/data-plt.s
++++ b/ld/testsuite/ld-loongarch-elf/data-plt.s
+@@ -2,6 +2,7 @@
+ # R_LARCH_PCALA_HI20 only need to generate PLT entry for function symbols.
+ 	.text
+ 	.globl	a
++	.hidden	a
+ 
+ 	.data
+ 	.align	2
+diff --git a/ld/testsuite/ld-loongarch-elf/ld-loongarch-elf.exp b/ld/testsuite/ld-loongarch-elf/ld-loongarch-elf.exp
+index 555ebf92..615548dc 100644
+--- a/ld/testsuite/ld-loongarch-elf/ld-loongarch-elf.exp
++++ b/ld/testsuite/ld-loongarch-elf/ld-loongarch-elf.exp
+@@ -166,6 +166,10 @@ if [istarget "loongarch64-*-*"] {
+     run_dump_test "relr-got-shared"
+     run_dump_test "relr-text-shared"
+     run_dump_test "abssym_shared"
++    run_dump_test "bad_pcala_hi20_global"
++    run_dump_test "bad_pcala_hi20_weak"
++    run_dump_test "bad_pcrel20_s2_global"
++    run_dump_test "bad_pcrel20_s2_weak"
+   }
+ 
+   if [check_pie_support] {
+-- 
+2.47.3
+

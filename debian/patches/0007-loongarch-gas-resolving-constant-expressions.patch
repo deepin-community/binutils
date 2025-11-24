@@ -1,0 +1,72 @@
+From 9f7dd59c803f303a04fac1bdd51f043178411618 Mon Sep 17 00:00:00 2001
+From: Alan Modra <amodra@gmail.com>
+Date: Thu, 17 Jul 2025 12:16:42 +0000
+Subject: [PATCH 07/12] loongarch gas resolving constant expressions
+
+The test added in commit 4fe96ddaf614 results in an asan complaint:
+loongarch-parse.y:225:16: runtime error: left shift of negative value -1
+To avoid the complaint, perform left shifts as unsigned (which gives
+the same result on 2's complement machines).  Do the same for
+addition, subtraction and multiplication.  Furthermore, warn on
+divide/modulus by zero.
+---
+ gas/config/loongarch-parse.y | 31 +++++++++++++++++++++++--------
+ 1 file changed, 23 insertions(+), 8 deletions(-)
+
+diff --git a/gas/config/loongarch-parse.y b/gas/config/loongarch-parse.y
+index ec5a4166..dbb49800 100644
+--- a/gas/config/loongarch-parse.y
++++ b/gas/config/loongarch-parse.y
+@@ -207,26 +207,41 @@ emit_bin (int op)
+       switch (op)
+ 	{
+ 	case '*':
+-	  opr1 = opr1 * opr2;
++	  opr1 = (valueT) opr1 * (valueT) opr2;
+ 	  break;
+ 	case '/':
+-	  opr1 = opr1 / opr2;
++          if (opr2 == 0)
++            {
++              as_warn (_("Divide by zero!"));
++              opr1 = 0;
++            }
++          else
++            opr1 = opr1 / opr2;
+ 	  break;
+ 	case '%':
+-	  opr1 = opr1 % opr2;
++          if (opr2 == 0)
++            {
++              as_warn (_("Divide by zero!"));
++              opr1 = 0;
++            }
++          else
++            opr1 = opr1 % opr2;
+ 	  break;
+ 	case '+':
+-	  opr1 = opr1 + opr2;
++          opr1 = (valueT) opr1 + (valueT) opr2;
+ 	  break;
+ 	case '-':
+-	  opr1 = opr1 - opr2;
++          opr1 = (valueT) opr1 - (valueT) opr2;
+ 	  break;
+ 	case LEFT_OP:
+-	  opr1 = opr1 << opr2;
++          opr1 = (valueT) opr1 << opr2;
+ 	  break;
+ 	case RIGHT_OP:
+-	  /* Algorithm right shift.  */
+-	  opr1 = (offsetT)opr1 >> (offsetT)opr2;
++          if (opr1 < 0)
++            as_warn (_("Right shift of negative numbers may be changed "
++                       "from arithmetic right shift to logical right shift!"));
++          /* Arithmetic right shift.  */
++          opr1 = opr1 >> opr2;
+ 	  break;
+ 	case '<':
+ 	  opr1 = opr1 < opr2;
+-- 
+2.47.3
+

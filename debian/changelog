@@ -1,3 +1,14 @@
+binutils (2.41-6deepin11) unstable; urgency=medium
+
+  * LoongArch: common sync from upstream
+    - Unskip cross segment alignment
+    - Fix symbol size after relaxation
+    - Fix incorrect display of FDEs address
+    - Use more appropriate assertions for relaxation
+    - set PRSTATUS_SIZE to match kernel
+
+ -- Peng Fan <fanpeng@loongson.cn>  Mon, 24 Nov 2025 01:50:41 +0000
+
 binutils (2.41-6deepin10) unstable; urgency=medium
 
   *  fix CVE-2024-57360 CVE-2024-53589 CVE-2025-0840 CVE-2025-1176 CVE-2025-1178

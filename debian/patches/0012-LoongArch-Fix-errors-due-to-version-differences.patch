@@ -1,0 +1,103 @@
+From 15c6f6873dfaf95cf9becbdcdf4f30a1fa20f562 Mon Sep 17 00:00:00 2001
+From: Peng Fan <fanpeng@loongson.cn>
+Date: Mon, 21 Jul 2025 02:01:17 +0000
+Subject: [PATCH 12/12] LoongArch: Fix errors due to version differences
+
+Signed-off-by: Peng Fan <fanpeng@loongson.cn>
+---
+ bfd/elfnn-loongarch.c     | 50 +++++++++++++++++++++++++++++----------
+ gas/config/tc-loongarch.c |  2 +-
+ 2 files changed, 39 insertions(+), 13 deletions(-)
+
+diff --git a/bfd/elfnn-loongarch.c b/bfd/elfnn-loongarch.c
+index 48de9f8e..2d9c6444 100644
+--- a/bfd/elfnn-loongarch.c
++++ b/bfd/elfnn-loongarch.c
+@@ -5392,33 +5392,59 @@ loongarch_relax_call36 (bfd *abfd, asection *sec, asection *sym_sec,
+ /* Relax pcalau12i,ld.d => pcalau12i,addi.d.  */
+ static bool
+ loongarch_relax_pcala_ld (bfd *abfd, asection *sec,
+-			  asection *sym_sec ATTRIBUTE_UNUSED,
+-			  Elf_Internal_Rela *rel_hi,
+-			  bfd_vma symval ATTRIBUTE_UNUSED,
+-			  struct bfd_link_info *info ATTRIBUTE_UNUSED,
+-			  bool *again ATTRIBUTE_UNUSED,
+-			  bfd_vma max_alignment ATTRIBUTE_UNUSED)
++        asection *sym_sec,
++        Elf_Internal_Rela *rel_hi,
++        bfd_vma symval,
++        struct bfd_link_info *info,
++        bool *again ATTRIBUTE_UNUSED,
++        bfd_vma max_alignment)
+ {
+   bfd_byte *contents = elf_section_data (sec)->this_hdr.contents;
+   Elf_Internal_Rela *rel_lo = rel_hi + 2;
+   uint32_t pca = bfd_get (32, abfd, contents + rel_hi->r_offset);
+   uint32_t ld = bfd_get (32, abfd, contents + rel_lo->r_offset);
+-  uint32_t rd = LARCH_GET_RD(pca);
++  uint32_t rd = LARCH_GET_RD (pca);
+   uint32_t addi_d = LARCH_OP_ADDI_D;
+ 
++  /* This section's output_offset need to subtract the bytes of instructions
++     relaxed by the previous sections, so it needs to be updated beforehand.
++     size_input_section already took care of updating it after relaxation,
++     so we additionally update once here.  */
++  sec->output_offset = sec->output_section->size;
++  bfd_vma pc = sec_addr (sec)
++         + loongarch_calc_relaxed_addr (info, rel_hi->r_offset);
++  if (sym_sec == sec)
++    symval = sec_addr (sec)
++       + loongarch_calc_relaxed_addr (info, symval - sec_addr (sec));
++
++  /* If pc and symbol not in the same segment, add/sub segment alignment.  */
++  if (!loongarch_two_sections_in_same_segment (info->output_bfd,
++                 sec->output_section,
++                 sym_sec->output_section))
++    max_alignment = info->maxpagesize > max_alignment ? info->maxpagesize
++                  : max_alignment;
++
++  if (symval > pc)
++    pc -= (max_alignment > 4 ? max_alignment : 0);
++  else if (symval < pc)
++    pc += (max_alignment > 4 ? max_alignment : 0);
++
+   if ((ELFNN_R_TYPE (rel_lo->r_info) != R_LARCH_GOT_PC_LO12)
+-      || (LARCH_GET_RD(ld) != rd)
+-      || (LARCH_GET_RJ(ld) != rd)
+-      || !LARCH_INSN_LD_D(ld))
++      || (LARCH_GET_RD (ld) != rd)
++      || (LARCH_GET_RJ (ld) != rd)
++      || !LARCH_INSN_LD_D (ld)
++      /* Within +-2G addressing range.  */
++      || (bfd_signed_vma)(symval - pc) < (bfd_signed_vma)(int32_t)0x80000000
++      || (bfd_signed_vma)(symval - pc) > (bfd_signed_vma)(int32_t)0x7fffffff)
+     return false;
+ 
+   addi_d = addi_d | (rd << 5) | rd;
+   bfd_put (32, abfd, addi_d, contents + rel_lo->r_offset);
+ 
+   rel_hi->r_info = ELFNN_R_INFO (ELFNN_R_SYM (rel_hi->r_info),
+-				 R_LARCH_PCALA_HI20);
++         R_LARCH_PCALA_HI20);
+   rel_lo->r_info = ELFNN_R_INFO (ELFNN_R_SYM (rel_lo->r_info),
+-				 R_LARCH_PCALA_LO12);
++         R_LARCH_PCALA_LO12);
+   return true;
+ }
+ 
+diff --git a/gas/config/tc-loongarch.c b/gas/config/tc-loongarch.c
+index 1d13cbb6..9be48be8 100644
+--- a/gas/config/tc-loongarch.c
++++ b/gas/config/tc-loongarch.c
+@@ -613,7 +613,7 @@ s_loongarch_align (int arg)
+ 
+ static const pseudo_typeS loongarch_pseudo_table[] =
+ {
+-  { "align", s_loongarch_align, -4 },
++  { "align", s_loongarch_align, 0 },
+   { "dword", cons, 8 },
+   { "word", cons, 4 },
+   { "half", cons, 2 },
+-- 
+2.47.3
+

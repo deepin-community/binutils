@@ -1,0 +1,54 @@
+From f43135ff3c30e5fad573369dcd192fba32da8ec3 Mon Sep 17 00:00:00 2001
+From: Alan Modra <amodra@gmail.com>
+Date: Tue, 20 May 2025 15:22:13 +0930
+Subject: [PATCH 08/12] ubsan: undefined shift in
+ loongarch_elf_add_sub_reloc_uleb128
+
+An oss-fuzz testcase found:
+runtime error: shift exponent 140 is too large for 32-bit type 'int'
+OK, that's just a completely silly uleb, but we ought to be able to
+handle 64 bits here.
+
+	* elfxx-loongarch.c (loongarch_elf_add_sub_reloc_uleb128): Formatting.
+	Don't left shift int.  Avoid shifts larger than bits in a bfd_vma.
+---
+ bfd/elfxx-loongarch.c | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
+
+diff --git a/bfd/elfxx-loongarch.c b/bfd/elfxx-loongarch.c
+index ee1323ea..83b4ee64 100644
+--- a/bfd/elfxx-loongarch.c
++++ b/bfd/elfxx-loongarch.c
+@@ -2171,11 +2171,11 @@ loongarch_elf_add_sub_reloc_uleb128 (bfd *abfd,
+   if (output_bfd != NULL)
+     return bfd_reloc_continue;
+ 
+-  relocation = symbol->value + symbol->section->output_section->vma
+-    + symbol->section->output_offset + reloc_entry->addend;
++  relocation = (symbol->value + symbol->section->output_section->vma
++		+ symbol->section->output_offset + reloc_entry->addend);
+ 
+-  bfd_size_type octets = reloc_entry->address
+-    * bfd_octets_per_byte (abfd, input_section);
++  bfd_size_type octets = (reloc_entry->address
++			  * bfd_octets_per_byte (abfd, input_section));
+   if (!bfd_reloc_offset_in_range (reloc_entry->howto, abfd,
+ 				  input_section, octets))
+     return bfd_reloc_outofrange;
+@@ -2195,8 +2195,11 @@ loongarch_elf_add_sub_reloc_uleb128 (bfd *abfd,
+       break;
+     }
+ 
+-  bfd_vma mask = (1 << (7 * len)) - 1;
+-  relocation = relocation & mask;
++  if (7 * len < sizeof (bfd_vma))
++    {
++      bfd_vma mask = ((bfd_vma) 1 << (7 * len)) - 1;
++      relocation = relocation & mask;
++    }
+   loongarch_write_unsigned_leb128 (p, len, relocation);
+   return bfd_reloc_ok;
+ }
+-- 
+2.47.3
+
