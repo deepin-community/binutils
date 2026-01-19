@@ -1,0 +1,3 @@
+libsframe.so.3 libsframe3 #MINVER#
+ (symver)LIBSFRAME_0.0 2.41
+ (symver)LIBSFRAME_3.0 2.45.50

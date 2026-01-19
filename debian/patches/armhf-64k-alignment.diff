@@ -1,0 +1,30 @@
+The upstream binutils commit below reduced the section alignment of
+armhf executables (including shared libraries) from 64k to 4k, on the
+basis that the additional bloat is not justified, given that arm64 hosts
+running 64k pagesize kernels with armhf user space are not used in
+practice.
+
+However, the situation is slightly different today on Debian, where a
+16k pagesize kernel is provided that enables compat support, and is
+therefore able to execute armhf user space. The only impediment is the
+fact that armhf binaries are no longer compatible with this, due to the
+change below.
+
+To accommodate this use case, revert the patch. This makes the generated
+executables compatible with compat mode on arm64 systems running 16k
+kernels.
+
+--- a/bfd/elf32-arm.c
++++ b/bfd/elf32-arm.c
+@@ -20167,7 +20167,11 @@ elf32_arm_backend_symbol_processing (bfd
+ #define ELF_ARCH			bfd_arch_arm
+ #define ELF_TARGET_ID			ARM_ELF_DATA
+ #define ELF_MACHINE_CODE		EM_ARM
++#ifdef __QNXTARGET__
+ #define ELF_MAXPAGESIZE			0x1000
++#else
++#define ELF_MAXPAGESIZE			0x10000
++#endif
+ #define ELF_COMMONPAGESIZE		0x1000
+ 
+ #define bfd_elf32_mkobject			elf32_arm_mkobject
