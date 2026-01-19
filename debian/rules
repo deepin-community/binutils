@@ -23,6 +23,8 @@ DEB_HOST_GNU_CPU	?= $(call vafilt,$(DPKG_VARS),DEB_HOST_GNU_CPU)
 DEB_HOST_GNU_TYPE	?= $(call vafilt,$(DPKG_VARS),DEB_HOST_GNU_TYPE)
 DEB_HOST_MULTIARCH	?= $(call vafilt,$(DPKG_VARS),DEB_HOST_MULTIARCH)
 
+include debian/rules.defs
+
 ifeq (,$(filter no, $(DEB_RULES_REQUIRES_ROOT)))
   require_root = yes
 endif
@@ -32,25 +34,6 @@ ifeq ($(require_root),yes)
 else
   CHOWN = : chown
   DPKG_DEB = dpkg-deb --root-owner-group
-endif
-
-ifeq (,$(filter $(distrelease),lenny etch squeeze wheezy jessie))
-  ifeq ($(DEB_HOST_GNU_TYPE),i586-linux-gnu)
-    DEB_BUILD_GNU_TYPE	= i686-linux-gnu
-    DEB_HOST_GNU_CPU	= i686
-    DEB_HOST_GNU_TYPE	= i686-linux-gnu
-    TRIPLET_SYMLINK	= i586-linux-gnu
-  else ifeq ($(DEB_HOST_GNU_TYPE),i586-kfreebsd-gnu)
-    DEB_BUILD_GNU_TYPE	= i686-kfreebsd-gnu
-    DEB_HOST_GNU_CPU	= i686
-    DEB_HOST_GNU_TYPE	= i686-kfreebsd-gnu
-    TRIPLET_SYMLINK	= i586-kfreebsd-gnu
-  else ifeq ($(DEB_HOST_GNU_TYPE),i586-gnu)
-    DEB_BUILD_GNU_TYPE	= i686-gnu
-    DEB_HOST_GNU_CPU	= i686
-    DEB_HOST_GNU_TYPE	= i686-gnu
-    TRIPLET_SYMLINK	= i586-gnu
-  endif
 endif
 
 p_bin = binutils
@@ -67,7 +50,9 @@ p_src = $(p_bin)-source
 p_ctf = libctf0
 p_ctfn = libctf-nobfd0
 p_gpng = libgprofng0
-p_sfrm = libsframe1
+p_gpnd = libgprofng-dev
+p_sfrm = libsframe3
+p_sfrd = libsframe-dev
 
 p_hst = $(p_bin)-for-host
 p_bld = $(p_bin)-for-build
@@ -107,7 +92,9 @@ d_src = debian/$(p_src)
 d_ctf = debian/$(p_ctf)
 d_ctfn = debian/$(p_ctfn)
 d_gpng = debian/$(p_gpng)
+d_gpnd = debian/$(p_gpnd)
 d_sfrm = debian/$(p_sfrm)
+d_sfrd = debian/$(p_sfrd)
 
 d_hst = debian/$(p_hst)
 d_bld = debian/$(p_bld)
@@ -120,8 +107,9 @@ install_script = install -m 755
 install_binary = install -m 755 -s --strip-program="$(STRIP)"
 
 NATIVE_ARCHS ?= amd64 i386 arm64 armhf armel ppc64el s390x
-NATIVE_ARCHS += arc hppa loong64 m68k powerpc \
-	riscv64 sh4 sparc64 x32
+NATIVE_ARCHS += alpha arc hppa loong64 m68k powerpc ppc64 \
+	riscv64 sh4 sparc sparc64 x32
+NATIVE_ARCHS += hurd-amd64 hurd-i386
 #NATIVE_ARCHS += nios2 or1k s390 sparc
 
 # don't generate the control file entries for native packages which are never
@@ -140,21 +128,20 @@ ifeq ($(DEB_SOURCE),binutils)
     # DEB_HOST_ARCH is filtered-out later anyway, do not test here.
     CROSS_ARCHS ?= amd64 i386 x32 \
                    s390x ppc64el arm64 armhf armel \
-                   arc hppa loong64 m68k \
-                   powerpc sh4 sparc64 \
-                   riscv64
+                   alpha arc hppa loong64 m68k \
+                   powerpc ppc64 sh4 sparc sparc64 \
+                   riscv64 \
+                   hurd-amd64 hurd-i386
   else ifeq ($(DEB_HOST_ARCH),arm64)
     CROSS_ARCHS ?= amd64 armel armhf i386 powerpc ppc64el riscv64 s390x \
-		   arc hppa m68k sh4 sparc64 x32 loong64
-  else ifeq ($(DEB_HOST_ARCH),loong64)
-    CROSS_ARCHS ?= amd64 arm64 armel armhf i386 powerpc ppc64el riscv64 s390x \
-		   arc hppa m68k sh4 sparc64 x32
+		   alpha arc hppa loong64 m68k sh4 sparc sparc64 x32
+  else ifeq ($(DEB_HOST_ARCH),ppc64)
+    CROSS_ARCHS ?= ppc64el
   else ifeq ($(DEB_HOST_ARCH),ppc64el)
-    CROSS_ARCHS ?= powerpc amd64 armel armhf arm64 i386 riscv64 s390x \
-		   arc hppa m68k sh4 sparc64 x32
-  else ifeq ($(DEB_HOST_ARCH),riscv64)
-    CROSS_ARCHS ?= amd64 arm64 armel armhf i386 loong64 powerpc ppc64el s390x \
-		   arc hppa m68k sh4 sparc64 x32
+    CROSS_ARCHS ?= powerpc ppc64 amd64 armel armhf arm64 i386 riscv64 s390x \
+		   alpha arc hppa loong64 m68k sh4 sparc sparc64 x32
+  else ifeq ($(DEB_HOST_ARCH),s390x)
+    CROSS_ARCHS ?= amd64 armhf arm64 i386 riscv64 powerpc ppc64 ppc64el
   endif
 else ifeq ($(DEB_SOURCE),binutils-ports)
   CROSS_ARCHS ?= m68k sh4
@@ -177,11 +164,7 @@ ifneq (,$(filter $(DEB_HOST_ARCH),amd64 i386 x32 hppa))
   with_hppa64 = yes
 endif
 
-ifeq ($(DEB_HOST_ARCH),sw64)
-  with_multiarch := no
-else
-  with_multiarch := yes
-endif
+with_multiarch := yes
 
 # disabled: no build-needed restriction used in the autopkg test
 ifeq (0,1)
@@ -194,53 +177,47 @@ ifneq (,$(ADT_TEST_TRIGGERS))
 endif
 endif
 
-ifneq (,$(filter $(DEB_HOST_ARCH),amd64 i386 arm64 x32))
-  with_gprofng = yes
-  CONF_GPROFNG = --enable-gprofng
-endif
+HOST_ARCHS_armhf = amd64 i386 x32 arm64 ppc64el s390x
+HOST_ARCHS_armel = amd64 i386 x32 arm64 ppc64el
+HOST_ARCHS_arm64 = amd64 i386 x32 ppc64el s390x
+HOST_ARCHS_powerpc = amd64 i386 x32 arm64 ppc64el s390x
+HOST_ARCHS_ppc64el = amd64 i386 x32 ppc64 arm64 s390x
+HOST_ARCHS_s390x = amd64 i386 x32 arm64 ppc64el
+HOST_ARCHS_amd64 = arm64 i386 ppc64el x32 s390x
+HOST_ARCHS_i386 = amd64 arm64 ppc64el x32 s390x
+HOST_ARCHS_riscv64 = amd64 i386 x32 arm64 ppc64el s390x
 
-HOST_ARCHS_armhf = amd64 i386 x32 arm64 ppc64el loong64 riscv64
-HOST_ARCHS_armel = amd64 i386 x32 arm64 ppc64el loong64 riscv64
-HOST_ARCHS_arm64 = amd64 i386 x32 ppc64el loong64 riscv64
-HOST_ARCHS_powerpc = amd64 i386 x32 arm64 ppc64el loong64 riscv64
-HOST_ARCHS_ppc64el = amd64 i386 x32 arm64 loong64 riscv64
-HOST_ARCHS_s390x = amd64 i386 x32 arm64 ppc64el loong64 riscv64
-HOST_ARCHS_amd64 = arm64 i386 ppc64el x32 arm64 loong64 riscv64
-HOST_ARCHS_i386 = amd64 arm64 ppc64el x32 arm64 loong64 riscv64
-HOST_ARCHS_riscv64 = amd64 i386 x32 arm64 ppc64el arm64 loong64 riscv64
-HOST_ARCHS_loong64 = amd64 i386 x32 arm64 ppc64el arm64 loong64 riscv64
+HOST_ARCHS_alpha = amd64 i386 x32 arm64 ppc64el
+HOST_ARCHS_arc = amd64 i386 x32 arm64 ppc64el
+HOST_ARCHS_hppa = amd64 i386 x32 arm64 ppc64el
+HOST_ARCHS_loong64 = amd64 i386 x32 arm64 ppc64el
+HOST_ARCHS_m68k = amd64 i386 x32 arm64 ppc64el
+HOST_ARCHS_ppc64 = amd64 i386 x32 ppc64el s390x
+HOST_ARCHS_sh4 = amd64 i386 x32 arm64 ppc64el
+HOST_ARCHS_sparc = amd64 i386 x32 arm64 ppc64el
+HOST_ARCHS_sparc64 = amd64 i386 x32 arm64 ppc64el
+HOST_ARCHS_x32 = amd64 arm64 i386 ppc64el
 
-HOST_ARCHS_arc = amd64 i386 x32 arm64 ppc64el arm64 loong64 riscv64
-HOST_ARCHS_hppa = amd64 i386 x32 arm64 ppc64el arm64 loong64 riscv64
-HOST_ARCHS_loong64 = amd64 i386 x32 arm64 ppc64el arm64 loong64 riscv64
-HOST_ARCHS_m68k = amd64 i386 x32 arm64 ppc64el arm64 loong64 riscv64
-HOST_ARCHS_sh4 = amd64 i386 x32 arm64 ppc64el arm64 loong64 riscv64
-HOST_ARCHS_sparc64 = amd64 i386 x32 arm64 ppc64el arm64 loong64 riscv64
-HOST_ARCHS_x32 = amd64 arm64 i386 ppc64el arm64 loong64 riscv64
+HOST_ARCHS_mips = amd64 i386 x32
+HOST_ARCHS_mipsel = amd64 i386 x32 arm64 ppc64el
+HOST_ARCHS_mipsn32 = amd64 i386 x32
+HOST_ARCHS_mipsn32el = amd64 i386 x32
+HOST_ARCHS_mips64 = amd64 i386 x32
+HOST_ARCHS_mips64el = amd64 i386 x32 arm64 ppc64el
 
-HOST_ARCHS_mips = amd64 i386 x32 arm64 loong64 riscv64
-HOST_ARCHS_mipsel = amd64 i386 x32 arm64 ppc64el loong64 riscv64
-HOST_ARCHS_mipsn32 = amd64 i386 x32 arm64 loong64 riscv64
-HOST_ARCHS_mipsn32el = amd64 i386 x32 arm64 loong64 riscv64
-HOST_ARCHS_mips64 = amd64 i386 x32 arm64 loong64 riscv64
-HOST_ARCHS_mips64el = amd64 i386 x32 arm64 ppc64el arm64 loong64 riscv64
+HOST_ARCHS_mipsr6 = amd64 i386 x32
+HOST_ARCHS_mipsr6el = amd64 i386 x32
+HOST_ARCHS_mipsn32r6 = amd64 i386 x32
+HOST_ARCHS_mipsn32r6el = amd64 i386 x32
+HOST_ARCHS_mips64r6 = amd64 i386 x32
+HOST_ARCHS_mips64r6el = amd64 i386 x32
 
-HOST_ARCHS_mipsr6 = amd64 i386 x32 arm64 loong64 riscv64
-HOST_ARCHS_mipsr6el = amd64 i386 x32 arm64 loong64 riscv64
-HOST_ARCHS_mipsn32r6 = amd64 i386 x32 arm64 loong64 riscv64
-HOST_ARCHS_mipsn32r6el = amd64 i386 x32 arm64 loong64 riscv64
-HOST_ARCHS_mips64r6 = amd64 i386 x32 arm64 loong64 riscv64
-HOST_ARCHS_mips64r6el = amd64 i386 x32 arm64 loong64 riscv64
-
-# Map a Debian architecture alias to a GNU type or a multiarch path component.
-run_dpkg_arch = $(or $(dpkg_arch_$1),$(eval \
-  dpkg_arch_$1 := $(shell dpkg-architecture -f -a$1))$(dpkg_arch_$1))
-_gnu_type  = $(call vafilt,$(run_dpkg_arch),DEB_HOST_GNU_TYPE)
-_multiarch = $(call vafilt,$(run_dpkg_arch),DEB_HOST_MULTIARCH)
+HOST_ARCHS_hurd-amd64 = amd64 i386 x32
+HOST_ARCHS_hurd-i386 = amd64 i386 x32
 
 # Convenient shortcuts for {configure,build,install,binary}.%: generic recipes.
 CROSS_ARCH	= $(subst .,,$(suffix $@))
-CROSS_GNU_TYPE	= $(subst i586,i686,$(call _gnu_type,$(CROSS_ARCH)))
+CROSS_GNU_TYPE	= $(call _gnu_type,$(CROSS_ARCH))
 P_CROSS		= binutils-$(subst _,-,$(CROSS_GNU_TYPE))
 D_CROSS		= debian/$(P_CROSS)
 
@@ -279,21 +256,7 @@ ifeq (,$(DEB_HOST_MULTIARCH))
   endif
 endif
 
-SHELL  = /bin/bash
-
-gold_targets = \
-	amd64 arm64 armel armhf i386 \
-	powerpc ppc64el sparc sparc64 s390x \
-	x32 kfreebsd-amd64 kfreebsd-i386 hurd-i386
-
-ifeq ($(DEB_HOST_ARCH),sw64)
-	gold_targets += sw64
-endif
-
-ifneq (,$(filter $(DEB_HOST_ARCH), $(gold_targets)))
-  with_gold = yes
-  gold_provides = -Vgold:Provides=binutils-gold
-endif
+export SHELL  = /bin/bash
 
 CFLAGS = -g -O2 -ffile-prefix-map=$(CURDIR)=.
 CXXFLAGS = -g -O2 -ffile-prefix-map=$(CURDIR)=.
@@ -301,12 +264,20 @@ LDFLAGS =
 CROSS := $(DEB_HOST_GNU_TYPE)-
 CC     = $(CROSS)gcc
 CXX    = $(CROSS)g++
+ifneq (,$(shell dpkg-buildflags | grep '^CFLAGS=.*-fno-omit-frame-pointer'))
+  CFLAGS += -fno-omit-frame-pointer
+  CXXFLAGS += -fno-omit-frame-pointer
+endif
+ifneq (,$(shell dpkg-buildflags | grep '^CFLAGS=.*-mbackchain'))
+  CFLAGS += -mbackchain
+  CXXFLAGS += -mbackchain
+endif
 STRIP  = $(CROSS)strip -R .comment -R .note
 STRIP_LTO = $(CROSS)strip -R .gnu.lto_* -R .gnu.debuglto_* -N __gnu_lto_slim -N __gnu_lto_v1
 
 ifeq (,$(findstring nopgo,$(DEB_BUILD_OPTIONS)))
   ifeq ($(DEB_BUILD_ARCH),$(DEB_HOST_ARCH))
-    ifeq (,$(filter $(DEB_HOST_ARCH), mipsel))
+    ifeq (,$(filter $(DEB_HOST_ARCH), armel armhf mipsel))
       CONF_PGO = --enable-pgo-build=lto
     endif
   endif
@@ -338,10 +309,23 @@ DEB_SVERSION	:= $(shell echo $(DEB_VERSION) | sed 's/+b[0-9][0-9]*$$//')
 VERSION		:= $(shell sed -n 's/^ *VERSION=\(.*\)/\1/p' bfd/configure | head -1 | tr -d \')
 DATE		:= $(shell sed -n 's/.* \([0-9]*\)$$/\1/p' bfd/version.h)
 ifneq (,$(DATE))
-#  DATE_EXT	:= .$(DATE)
+  DATE_EXT	:= .$(DATE)
 endif
 BUILD_DATE := $(shell dpkg-parsechangelog | sed -n -e 's/^Date: //p')
 BUILD_DAY  := $(shell date -Idate -u -d "$(BUILD_DATE)")
+
+# package metadata information
+ifeq (,$(ELF_PACKAGE_METADATA))
+  ELF_PACKAGE_METADATA := $(subst $(SPACE),,{ \
+	"type":"deb", \
+	"os":"$(shell awk -F= '/^ID=/ {print $$2}' /etc/os-release)", \
+	"name":"$(DEB_SOURCE)", \
+	"version":"$(DEB_VERSION)", \
+	"architecture":"$(DEB_HOST_ARCH)" \
+	$(if $(DEB_BUILD_DEBUG_INFO_URL),$(COMMA)"debugInfoUrl":"$(DEB_BUILD_DEBUG_INFO_URL)") \
+    })
+  export ELF_PACKAGE_METADATA
+endif
 
 is_rc = yes
 is_rc =
@@ -399,33 +383,14 @@ gfdl_toplevel_texinfo_files = \
 gfdl_generated_files = \
 	bfd/doc/bfd.info
 
-programs = addr2line ar as c++filt elfedit gprof ld ld.bfd
-programs += nm objcopy objdump ranlib readelf size strings strip
-ifeq ($(with_gprofng),yes)
-  programs += gprofng gp-collect-app
-  programs += gp-archive gp-display-html gp-display-src gp-display-text
-endif
-ifeq ($(with_gold),yes)
-  programs += gold ld.gold dwp
-endif
 
 ########################################
 
-CONFARGS = \
-	--disable-silent-rules \
-	--enable-obsolete \
-	--enable-shared \
-	--enable-plugins \
-	--enable-threads \
-	--enable-jansson \
-	--with-system-zlib \
+CONFARGS = $(BINUTILS_BASECONF) \
 	--prefix=/$(PF) \
 	--sysconfdir=/etc \
-	--enable-deterministic-archives \
-	--disable-compressed-debug-sections \
-	--enable-new-dtags \
-	--disable-x86-used-note \
-	--with-gold-ldflags=-static-libstdc++ \
+	--enable-shared \
+	--with-system-zlib \
 	--build=$(DEB_BUILD_GNU_TYPE) \
 	--host=$(DEB_HOST_GNU_TYPE) \
 	--with-pkgversion="GNU Binutils for $(distribution)"
@@ -433,139 +398,14 @@ CONFARGS = \
 # not yet ready for GCC 4.9
 CONFARGS += --disable-werror
 
-DEB_TARGET_MULTIARCH32_amd64		= i386-linux-gnu
-DEB_TARGET_MULTIARCHX32_amd64		= x86_64-linux-gnux32
-
-DEB_TARGET_MULTIARCH32_x32		= i386-linux-gnu
-DEB_TARGET_MULTIARCH64_x32		= x86_64-linux-gnu
-
-DEB_TARGET_MULTIARCH32_powerpc		= powerpc-linux-gnu
-
-DEB_TARGET_MULTIARCH32_s390x		= s390-linux-gnu
-
-DEB_TARGET_MULTIARCH32_sparc64		= sparc-linux-gnu
-
-DEB_TARGET_MULTIARCH32_kfreebsd-amd64	= i386-kfreebsd-gnu
-
-DEB_TARGET_MULTIARCH64_i386		= x86_64-linux-gnu
-DEB_TARGET_MULTIARCHX32_i386		= x86_64-linux-gnux32
-
-DEB_TARGET_MULTIARCH64_powerpc		= powerpc64-linux-gnu
-
-DEB_TARGET_MULTIARCH64_sparc		= sparc64-linux-gnu
-
-DEB_TARGET_MULTIARCH64_s390		= s390x-linux-gnu
-
-DEB_TARGET_MULTIARCH64_kfreebsd-i386	= x86_64-kfreebsd-gnu
-
-DEB_TARGET_MULTIARCH64_mips		= mips64-linux-gnuabi64
-DEB_TARGET_MULTIARCHN32_mips		= mips64-linux-gnuabin32
-
-DEB_TARGET_MULTIARCH64_mipsel		= mips64el-linux-gnuabi64
-DEB_TARGET_MULTIARCHN32_mipsel		= mips64el-linux-gnuabin32
-
-DEB_TARGET_MULTIARCH64_mipsn32		= mips64-linux-gnuabi64
-DEB_TARGET_MULTIARCH32_mipsn32		= mips-linux-gnu
-
-DEB_TARGET_MULTIARCH64_mipsn32el 	= mips64el-linux-gnuabi64
-DEB_TARGET_MULTIARCH32_mipsn32el 	= mipsel-linux-gnu
-
-DEB_TARGET_MULTIARCH32_mips64		= mips-linux-gnu
-DEB_TARGET_MULTIARCHN32_mips64		= mips64-linux-gnuabin32
-
-DEB_TARGET_MULTIARCH32_mips64el		= mipsel-linux-gnu
-DEB_TARGET_MULTIARCHN32_mips64el	= mips64el-linux-gnuabin32
-
-DEB_TARGET_MULTIARCH64_mipsr6		= mipsisa64r6-linux-gnuabi64
-DEB_TARGET_MULTIARCHN32_mipsr6	= mipsisa64r6-linux-gnuabin32
-
-DEB_TARGET_MULTIARCH64_mipsr6el	= mipsisa64r6el-linux-gnuabi64
-DEB_TARGET_MULTIARCHN32_mipsr6el	= mipsisa64r6el-linux-gnuabin32
-
-DEB_TARGET_MULTIARCH64_mipsn32r6	= mipsisa64r6-linux-gnuabi64
-DEB_TARGET_MULTIARCH32_mipsn32r6	= mipsisa32r6-linux-gnu
-
-DEB_TARGET_MULTIARCH64_mipsn32r6el 	= mipsisa64r6el-linux-gnuabi64
-DEB_TARGET_MULTIARCH32_mipsn32r6el 	= mipsisa32r6el-linux-gnu
-
-DEB_TARGET_MULTIARCH32_mips64r6		= mipsisa32r6-linux-gnu
-DEB_TARGET_MULTIARCHN32_mips64r6	= mipsisa64r6-linux-gnuabin32
-
-DEB_TARGET_MULTIARCH32_mips64r6el	= mipsisa32r6el-linux-gnu
-DEB_TARGET_MULTIARCHN32_mips64r6el	= mipsisa64r6el-linux-gnuabin32
-
-DEB_TARGET_MULTIARCH32_arm64		= aarch64_ilp32-linux-gnu
-
-SET_MULTIARCH_ENV = \
-	DEB_TARGET_MULTIARCH=$(call _multiarch,$1) \
-	$(if $(DEB_TARGET_MULTIARCH32_$1) ,DEB_TARGET_MULTIARCH32=$(DEB_TARGET_MULTIARCH32_$1)) \
-	$(if $(DEB_TARGET_MULTIARCH64_$1) ,DEB_TARGET_MULTIARCH64=$(DEB_TARGET_MULTIARCH64_$1)) \
-	$(if $(DEB_TARGET_MULTIARCHX32_$1),DEB_TARGET_MULTIARCHX32=$(DEB_TARGET_MULTIARCHX32_$1)) \
-	$(if $(DEB_TARGET_MULTIARCHN32_$1),DEB_TARGET_MULTIARCHN32=$(DEB_TARGET_MULTIARCHN32_$1))
-
-CONFARGS_TARGET_sparc		= --enable-targets=sparc64-linux-gnu
-CONFLICTS_TARGET_sparc		= -VextraConflicts="libc6-dev-sparc64 (<< 2.2.5-7)"
-
-CONFARGS_TARGET_sparc64		= --enable-targets=sparc-linux-gnu
-CONFLICTS_TARGET_sparc64	= -VextraConflicts="libc6-dev-sparc64 (<< 2.2.5-7)"
-
-CONFARGS_TARGET_powerpc		= --enable-targets=powerpc64-linux-gnu
-
-CONFARGS_TARGET_ppc64		= --enable-targets=powerpc-linux-gnu
-
-CONFARGS_TARGET_ppc64el		= --enable-targets=powerpc-linux-gnu
-
-CONFARGS_TARGET_s390		= --enable-targets=s390x-linux-gnu
-
-CONFARGS_TARGET_s390x		= --enable-targets=s390-linux-gnu
-
-CONFARGS_TARGET_amd64		= --enable-targets=x86_64-linux-gnux32,x86_64-pep
-CONFARGS_TARGET_sw64		= --with-cpu=sw6b
-
-CONFARGS_TARGET_i386		= --enable-targets=x86_64-linux-gnu,x86_64-linux-gnux32,x86_64-pep
-
-CONFARGS_TARGET_x32		= --enable-targets=x86_64-linux-gnu,x86_64-pep
-
-CONFLICTS_TARGET_amd64		= -VextraConflicts="binutils-mingw-w64-i686 (<< 2.23.52.20130612-1+3), binutils-mingw-w64-x86-64 (<< 2.23.52.20130612-1+3)"
-CONFLICTS_TARGET_i386 = $(CONFLICTS_TARGET_amd64)
-CONFLICTS_TARGET_x32  = $(CONFLICTS_TARGET_amd64)
-
-CONFARGS_TARGET_riscv64		= --with-isa-spec=2.2
-
-CONFARGS_TARGET_kfreebsd-i386	= --enable-targets=x86_64-kfreebsd-gnu
-
-CONFARGS_TARGET_mips		= --enable-targets=mips64-linux-gnuabi64,mips64-linux-gnuabin32
-
-CONFARGS_TARGET_mipsel		= --enable-targets=mips64el-linux-gnuabi64,mips64el-linux-gnuabin32 --enable-mips-fix-loongson3-llsc=yes
-
-CONFARGS_TARGET_mipsn32		= --enable-targets=mips64-linux-gnuabi64,mips-linux-gnu
-
-CONFARGS_TARGET_mipsn32el	= --enable-targets=mips64el-linux-gnuabi64,mipsel-linux-gnu --enable-mips-fix-loongson3-llsc=yes
-
-CONFARGS_TARGET_mips64		= --enable-targets=mips64-linux-gnuabin32,mips-linux-gnu
-
-CONFARGS_TARGET_mips64el	= --enable-targets=mips64el-linux-gnuabin32,mipsel-linux-gnu --enable-mips-fix-loongson3-llsc=yes
-
-CONFARGS_TARGET_mipsr6	= --enable-targets=mipsisa64r6-linux-gnuabi64,mipsisa64r6-linux-gnuabin32
-
-CONFARGS_TARGET_mipsr6el	= --enable-targets=mipsisa64r6el-linux-gnuabi64,mipsisa64r6el-linux-gnuabin32
-
-CONFARGS_TARGET_mipsn32r6	= --enable-targets=mipsisa64r6-linux-gnuabi64,mipsisa32r6-linux-gnu
-
-CONFARGS_TARGET_mipsn32r6el	= --enable-targets=mipsisa64r6el-linux-gnuabi64,mipsisa32r6el-linux-gnu
-
-CONFARGS_TARGET_mips64r6	= --enable-targets=mipsisa64r6-linux-gnuabin32,mipsisa32r6-linux-gnu
-
-CONFARGS_TARGET_mips64r6el	= --enable-targets=mipsisa64r6el-linux-gnuabin32,mipsisa32r6el-linux-gnu
-
-CONFARGS_TARGET_aarch64		= --enable-targets=aarch64_be-linux-gnu
-
-CONFARGS_TARGET_arc		= --with-cpu=hs38_linux
-
 with_check := yes
 ifneq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
   # override buildd admins to run the testsuite anyway ...
-  ifeq (,$(filter $(DEB_HOST_ARCH), m68k powerpc sh4 sparc64))
+  ifneq (,$(filter $(DEB_HOST_ARCH), m68k sh4))
+    ifneq (,$(findstring nocheck,$(LOCAL_BUILD_OPTIONS)))
+      with_check := disabled through LOCAL_BUILD_OPTIONS
+    endif
+  else
     with_check := disabled through DEB_BUILD_OPTIONS
   endif
 endif
@@ -574,7 +414,8 @@ ifneq (,$(filter $(DEB_HOST_ARCH), none))
 endif
 #with_check := disabled for this upload
 
-regression_archs = m68k
+regression_archs = m68k sh4 x32
+regression_archs = amd64 arm64
 ifneq (,$(filter $(DEB_HOST_ARCH), $(regression_archs)))
   ignore_regressions := regressions ignored on architecture $(DEB_HOST_ARCH)
 endif
@@ -598,26 +439,23 @@ update-patches:
 
 ###############################################################################
 
-# And now the rules...
-include debian/rules.d/*.mk
-
 ################
 # clean target #
 ################
 
-clean: unpatch
+clean:
 	$(checkdir)
 	rm -rf stamps
 	rm -rf builddir-*
 	rm -rf stamps
 	find . -name \*.gmo -o -name \*~ -o -name \*.info ! -name sysroff.info | xargs -r rm -f
 	rm -f test-summary*
-	rm -rf $(d_bin) $(d_com) $(d_lib) $(d_lib)-dbg $(d_nat) $(d_nat)-dbg \
+	rm -rf $(d_bin) $(d_bin)-dbg $(d_com) $(d_lib) $(d_lib)-dbg $(d_nat) $(d_nat)-dbg \
 	  $(d_hst) $(d_dev) $(d_mul) $(d_mul)-dbg $(d_mdev) $(d_doc) \
 	  $(d_hppa64) $(d_hppa64)-dbg $(d_src) $(d_bld) \
-	  $(d_ctf) $(d_ctf)-dbg $(d_ctfn) $(d_ctfn)-dbg $(d_gpng) $(d_gpng)-dbg \
-	  $(d_sfrm) $(d_sfrm)-dbg
-	rm -rf $(foreach ca,$(CROSS_ARCHS),debian/binutils-$(subst _,-,$(subst i586,i686,$(call _gnu_type,$(ca)))){,-dbg})
+	  $(d_ctf) $(d_ctf)-dbg $(d_ctfn) $(d_ctfn)-dbg $(d_gpng) $(d_gpnd) $(d_gpng)-dbg \
+	  $(d_sfrm) $(d_sfrm)-dbg $(d_sfrd)
+	rm -rf $(foreach ca,$(CROSS_ARCHS),debian/binutils-$(subst _,-,$(call _gnu_type,$(ca))){,-dbg})
 	rm -rf debian/tmp debian/files* debian/substvars
 	rm -f debian/*.orig debian/*.rej
 	rm -f debian/files debian/substvars
@@ -635,7 +473,10 @@ endif
 
 stamps/control: debian/control.in debian/control.cross.in
 ifneq (,$(TARGET))
-	sed -n -e 's/@dpkg_dev@/$(DPKG_DEV)/;/^Package: binutils-for-build$$/q;p' \
+	sed -n -e 's/@dpkg_dev@/$(DPKG_DEV)/' \
+	    -e 's/@gold_archs@/$(gold_targets)/' \
+	    -e 's/@gprofng_archs@/$(gprofng_archs)/' \
+	    -e '/^Package: binutils-for-build$$/q;p' \
 		< debian/control.in > debian/control
 	sed -e "s/@target@/$(subst _,-,$(DEB_TARGET_GNU_TYPE))/g" \
 		-e "s/@host_archs@/any/" \
@@ -643,12 +484,14 @@ ifneq (,$(TARGET))
 		< debian/control.cross.in >> debian/control
 else
 	sed -e 's/@dpkg_dev@/$(DPKG_DEV)/' \
+	    -e 's/@gold_archs@/$(gold_targets)/' \
+	    -e 's/@gprofng_archs@/$(gprofng_archs)/' \
 		debian/control.in > debian/control
 	$(foreach ca,$(NATIVE_ARCHS), \
 	  sed \
 	    -e 's/@host_archs@/$(ca)$(if $(and $(filter yes,$(with_cross)),$(filter $(ca),$(DEB_HOST_ARCH) $(CROSS_ARCHS))), $(HOST_ARCHS_$(ca)))/g' \
-	    -e 's/@target@/$(subst _,-,$(subst i586,i686,$(call _gnu_type,$(ca))))/g' \
-	    -e 's/@binutils_alt_triplet@/$(if $(findstring i386,$(ca)),binutils-$(subst i686,i586,$(call _gnu_type,$(ca))))/g' \
+	    -e 's/@target@/$(subst _,-,$(call _gnu_type,$(ca)))/g' \
+	    -e 's/@binutils_alt_triplet@/$(if $(findstring i386,$(ca)),binutils-$(call _gnu_type,$(ca)))/g' \
 	    -e '$(if $(filter yes,$(same_source)),/^Built-Using/d)' \
 	    debian/control.cross.in >> debian/control; \
 	)
@@ -663,6 +506,8 @@ endif
 SINGLE_CONFARGS = $(CONFARGS) $(CONFARGS_TARGET_$(DEB_HOST_ARCH))
 ifeq ($(with_gold),yes)
 	SINGLE_CONFARGS += --enable-ld=default --enable-gold
+else
+	SINGLE_CONFARGS += --enable-ld=default --disable-gold
 endif
 SINGLE_CONFARGS += $(CONF_PGO) $(CONF_GPROFNG)
 
@@ -689,7 +534,7 @@ endif
 	rm -rf stamps/configure-single builddir-single
 	mkdir builddir-single
 	cd builddir-single && env CC="$(CC)" CXX="$(CXX)" CFLAGS="$(CFLAGS)" CXXFLAGS="$(CXXFLAGS)" LDFLAGS="$(LDFLAGS)" \
-		$(call SET_MULTIARCH_ENV,$(DEB_HOST_ARCH)) \
+		$(call SET_BINUTILS_MULTIARCH_ENV,$(DEB_HOST_ARCH)) \
 		../configure --with-sysroot=/ \
 			--libdir=/$(PF)/lib/$(DEB_HOST_MULTIARCH) \
 			$(SINGLE_CONFARGS)
@@ -700,13 +545,13 @@ stamps/build-single: stamps/configure-single
 	$(checkdir)
 	@echo BEGIN $@
 	env BFD_SOVER_EXT="$(SINGLE_VERSION)" CTF_SOVER_EXT="" \
-	  $(call SET_MULTIARCH_ENV,$(DEB_HOST_ARCH)) \
+	  $(call SET_BINUTILS_MULTIARCH_ENV,$(DEB_HOST_ARCH)) \
 	    $(MAKE) $(NJOBS) -C builddir-single \
 		LDFLAGS="-Wl,-z,relro"
 ifeq ($(DEB_BUILD_GNU_TYPE),$(DEB_HOST_GNU_TYPE))
 ifeq ($(with_check),yes)
 	-env MAKE="$(MAKE) VERSION=$(SINGLE_VERSION)" \
-	  $(call SET_MULTIARCH_ENV,$(DEB_HOST_ARCH)) \
+	  $(call SET_BINUTILS_MULTIARCH_ENV,$(DEB_HOST_ARCH)) \
 	    $(MAKE) -C builddir-single -k check
 	rm -f $(pwd)/test-summary
 	for f in \
@@ -751,6 +596,39 @@ endif
 
 ###############################################################################
 
+#######################
+# pic build           #
+#######################
+
+PIC_CONFARGS = $(CONFARGS) $(CONFARGS_TARGET_$(DEB_HOST_ARCH))
+PIC_CONFARGS += --enable-ld=default --disable-gold --disable-gprofng
+
+stamps/configure-pic:
+	$(checkdir)
+	find -name '*.[1-8]' -size 0 | xargs -r rm -f
+
+	rm -rf stamps/configure-pic builddir-pic
+	mkdir builddir-pic
+	cd builddir-pic && env CC="$(CC)" CXX="$(CXX)" CFLAGS="-fPIC $(CFLAGS)" CXXFLAGS="-fPIC $(CXXFLAGS)" LDFLAGS="$(LDFLAGS)" \
+		$(call SET_BINUTILS_MULTIARCH_ENV,$(DEB_HOST_ARCH)) \
+		../configure --with-sysroot=/ \
+			--libdir=/$(PF)/lib/$(DEB_HOST_MULTIARCH) \
+			$(PIC_CONFARGS)
+	@mkdir -p stamps
+	touch $@
+
+stamps/build-pic: stamps/configure-pic
+	$(checkdir)
+	@echo BEGIN $@
+	env BFD_SOVER_EXT="$(SINGLE_VERSION)" CTF_SOVER_EXT="" \
+	  $(call SET_BINUTILS_MULTIARCH_ENV,$(DEB_HOST_ARCH)) \
+	    $(MAKE) $(NJOBS) -C builddir-pic \
+		LDFLAGS="-Wl,-z,relro"
+	touch $@
+
+
+###############################################################################
+
 #####################
 # multiarch targets #
 #####################
@@ -758,6 +636,7 @@ endif
 multiarch_targets = \
 	aarch64-linux-gnu \
 	aarch64_be-linux-gnu \
+	alpha-linux-gnu \
 	arm-linux-gnueabi \
 	hppa-linux-gnu \
 	i686-linux-gnu \
@@ -791,10 +670,6 @@ multiarch_targets = \
 	m32r-linux-gnu \
 	x86_64-pep
 
-ifeq ($(DEB_HOST_ARCH),sw64)
-	multiarch_targets += sw_64-linux-gnu
-endif
-
 # try to work around #758830
 ifeq ($(DEB_HOST_ARCH),sh4)
   multiarch_targets := $(filter-out hppa-linux-gnu, $(multiarch_targets))
@@ -808,7 +683,7 @@ stamps/configure-multi:
 	mkdir builddir-multi
 	cd builddir-multi \
 	    && env CC="$(CC)" CXX="$(CXX)" CFLAGS="$(CFLAGS)" CXXFLAGS="$(CXXFLAGS)" LDFLAGS="$(LDFLAGS)" \
-	        $(call SET_MULTIARCH_ENV,$(DEB_HOST_ARCH)) \
+	        $(call SET_BINUTILS_MULTIARCH_ENV,$(DEB_HOST_ARCH)) \
 		../configure $(CONFARGS) $(CONF_PGO) $(CONF_GPROFNG) \
 		  $(filter-out --enable-targets=%, $(CONFARGS_TARGET_$(DEB_HOST_ARCH))) \
 		  --with-sysroot=/ \
@@ -821,7 +696,7 @@ stamps/build-multi: stamps/configure-multi
 	$(checkdir)
 	@echo BEGIN $@
 	env BFD_SOVER_EXT="$(MULTI_VERSION)" CTF_SOVER_EXT="$(MULTI_VERSION)" \
-	  $(call SET_MULTIARCH_ENV,$(DEB_HOST_ARCH)) \
+	  $(call SET_BINUTILS_MULTIARCH_ENV,$(DEB_HOST_ARCH)) \
 	  $(MAKE) $(NJOBS) -C builddir-multi \
 		LDFLAGS="-Wl,-z,relro"
 	touch $@
@@ -836,6 +711,8 @@ CROSS_CONFARGS = $(CONFARGS) --enable-initfini-array
 
 ifeq ($(with_gold),yes)
 	CROSS_CONFARGS += --enable-ld=default --enable-gold
+else
+	CROSS_CONFARGS += --enable-ld=default --disable-gold
 endif
 
 stamps/configure.%:
@@ -845,13 +722,13 @@ stamps/configure.%:
 	mkdir builddir-$*
 	cd builddir-$* \
 	    && env CC="$(CC)" CXX="$(CXX)" \
-	       $(call SET_MULTIARCH_ENV,$*) \
+	       $(call SET_BINUTILS_MULTIARCH_ENV,$*) \
 		../configure \
 		  $(CROSS_CONFARGS) \
 		  $(CONFARGS_TARGET_$(*)) \
 		  --with-sysroot=/ \
 		  --libdir=/$(PF)/lib/$(call _multiarch,$*) \
-		  $(if $(filter $*, $(gold_targets)),--enable-ld=default --enable-gold,--disable-gold) \
+		  $(if $(filter $*, $(gold_targets)),--enable-ld=default $(if $(filter yes,$(with_gold)),--enable-gold,--disable-gold),--disable-gold) \
 		  --target=$(CROSS_GNU_TYPE)
 	@mkdir -p stamps
 	touch $@
@@ -860,7 +737,7 @@ stamps/build.%: stamps/configure.%
 	$(checkdir)
 	@echo BEGIN $@
 	env BFD_SOVER_EXT="-$*" CTF_SOVER_EXT="-$*" \
-	  $(call SET_MULTIARCH_ENV,$*) \
+	  $(call SET_BINUTILS_MULTIARCH_ENV,$*) \
 	  $(MAKE) -C builddir-$* $(NJOBS) \
 		CFLAGS="$(CFLAGS)" \
 		CXXFLAGS="$(CXXFLAGS)" \
@@ -868,7 +745,7 @@ stamps/build.%: stamps/configure.%
 ifeq ($(DEB_BUILD_GNU_TYPE),$(DEB_HOST_GNU_TYPE))
 ifeq ($(with_check),yes)
 	-env MAKE="$(MAKE) VERSION=$(VERSION)-$*" \
-	  $(call SET_MULTIARCH_ENV,$*) \
+	  $(call SET_BINUTILS_MULTIARCH_ENV,$*) \
 	    $(MAKE) -C builddir-$* -k check
 	rm -f $(pwd)/test-summary-$*
 	for f in \
@@ -960,10 +837,11 @@ stamps/install.%: stamps/build.%
 	done
 
 	: # gold symlinks
-	$(if $(filter $*, $(gold_targets)), \
+	$(if $(filter $*, $(gold_targets)),$(if $(filter yes,$(with_gold)), \
 	  ln -sf $(CROSS_GNU_TYPE)-ld.gold $(D_CROSS)/usr/bin/$(CROSS_GNU_TYPE)-gold; \
-	  ln -sf ../../bin/$(CROSS_GNU_TYPE)-gold $(D_CROSS)/usr/$(CROSS_GNU_TYPE)/bin/gold \
-	)
+	  ln -sf ../../bin/$(CROSS_GNU_TYPE)-gold $(D_CROSS)/usr/$(CROSS_GNU_TYPE)/bin/gold; \
+	  ln -sf ../../bin/$(CROSS_GNU_TYPE)-dwp $(D_CROSS)/usr/$(CROSS_GNU_TYPE)/bin/dwp \
+	))
 
 	: # no spu toolchain
 	rm -f $(D_CROSS)/$(PF)/bin/*embedspu
@@ -971,9 +849,14 @@ stamps/install.%: stamps/build.%
 	: # no gprofng in cross packages
 	rm -f $(D_CROSS)/$(PF)/bin/*-gprofng
 	rm -f $(D_CROSS)/$(PF)/bin/*-gp-*
+	rm -f $(D_CROSS)/$(PF)/bin/*-gprofng-*
 	rm -rf $(D_CROSS)/$(PF)/lib/*/gprofng
 	rm -f $(D_CROSS)/$(PF)/lib/$(call _multiarch,$*)/libgprofng*
+	rm -rf $(D_CROSS)/$(PF)/share/doc/gprofng
+
 	rm -f $(D_CROSS)/$(PF)/lib/$(call _multiarch,$*)/libsframe*
+	: # symlinks installed without prefix ...
+	rm -f $(D_CROSS)/$(PF)/bin/gp-*
 
 	: # Remove windows related manpages
 	rm -f $(D_CROSS)/$(PF)/share/man/man1/$(CROSS_GNU_TYPE)-{dlltool,nlmconv,windmc,windres}.1
@@ -990,11 +873,11 @@ stamps/install.%: stamps/build.%
 	  $(D_CROSS)/$(PF)/share/man/man1/$(CROSS_GNU_TYPE)-ld.1.gz
 
 	: # gold man pages
-	$(if $(filter $*, $(gold_targets)), \
+	$(if $(filter $*, $(gold_targets)),$(if $(filter yes,$(with_gold)), \
 	  ln -sf ld.gold.1.gz $(D_CROSS)/$(PF)/share/man/man1/$(CROSS_GNU_TYPE)-gold.1.gz; \
 	  ln -sf ld.gold.1.gz $(D_CROSS)/$(PF)/share/man/man1/$(CROSS_GNU_TYPE)-ld.gold.1.gz; \
 	  ln -sf dwp.1.gz $(D_CROSS)/$(PF)/share/man/man1/$(CROSS_GNU_TYPE)-dwp.1.gz; \
-	)
+	))
 
 	: # Don't want /usr/<arch>-linux to exist in any package, don't ship development files
 	rm -rf $(D_CROSS)/$(PF)/$(DEB_HOST_GNU_TYPE)
@@ -1011,16 +894,6 @@ stamps/install.%: stamps/build.%
 	chrpath -k -d $$(file $(D_CROSS)/usr/bin/*|awk -F: '/ ELF/ {print $$1}')
 	chrpath -k -d $$(file $(D_CROSS)/usr/lib/$(DEB_HOST_MULTIARCH)/lib*.so*|awk -F: '/ ELF/ {print $$1}')
 
-ifneq (,$(filter $(distrelease),lenny etch squeeze wheezy jessie stretch))
-	: # temporary i586-* symlinks for stretch
-	compat=$$(echo $(CROSS_GNU_TYPE) | sed 's/i686/i586/'); \
-	case "$(CROSS_GNU_TYPE)" in i686-*) \
-	  for i in $(programs); do \
-	    ln -sf $(CROSS_GNU_TYPE)-$$i $(D_CROSS)/$(PF)/bin/$$compat-$$i; \
-	    ln -sf $(CROSS_GNU_TYPE)-$$i.1.gz $(D_CROSS)/$(PF)/share/man/man1/$$compat-$$i.1.gz; \
-	  done; \
-	esac
-endif
 	touch $@
 
 ###############################################################################
@@ -1053,7 +926,7 @@ stamps/build-hppa64: stamps/configure-hppa64
 
 ###############################################################################
 
-pre-build: patch
+pre-build:
 #ifneq (,$(filter $(DEB_HOST_ARCH), armel powerpc))
 #	@echo Build it ...
 #else
@@ -1062,6 +935,7 @@ pre-build: patch
 #endif
 
 build_stamps = stamps/build-single
+build_stamps += stamps/build-pic
 ifeq ($(with_multiarch),yes)
        build_stamps += stamps/build-multi
 endif
@@ -1142,14 +1016,22 @@ stamps/install: checkroot stamps/build $(install_stamps)
 	mv $(d_bin)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/ldscripts \
 		$(d_nat)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/.
 
-	$(install_dir) $(d_com)/$(PF)/share/man
-	mv $(d_bin)/$(PF)/share/man/man1 $(d_com)/$(PF)/share/man/.
-	for f in $(d_com)/$(PF)/share/man/man1/*.1; do \
+	$(install_dir) $(d_com)/$(PF)/share/man/man1
+	set -e; for f in $(d_bin)/$(PF)/share/man/man1/*.1; do \
 	  sed -i -e '/^\.TH /s/[0-9]*-[0-9]*-[0-9]*/$(BUILD_DAY)/' $$f; \
+	  case "$$f" in \
+	    *gprofng*) ;; \
+	    *) mv "$$f" '$(d_com)/$(PF)/share/man/man1/' ;; \
+          esac;	\
 	done
 
 ifeq ($(with_gprofng),yes)
-	chrpath -k -d $$(file $(d_bin)/usr/bin/{gprofng,gp-*}|awk -F: '/ ELF/ {print $$1}')
+	$(install_dir) $(d_doc)/$(PF)/share/doc/binutils
+	mv $(d_bin)/$(PF)/share/doc/gprofng $(d_doc)/$(PF)/share/doc/binutils/.
+	$(install_dir) $(d_doc)/$(PF)/share/doc/binutils-doc
+	ln -sf ../binutils/gprofng $(d_doc)/$(PF)/share/doc/binutils-doc/gprofng
+
+	chrpath -k -d $$(file $(d_bin)/usr/bin/{gprofng,gprofng-*}|awk -F: '/ ELF/ {print $$1}')
 endif
 
 ifeq ($(with_multiarch),yes)
@@ -1183,10 +1065,10 @@ endif
 	cp -f include/plugin-api.h $(d_bin)/$(PF)/include
 
 	: # We don't need to distribute everything in binutils and -dev
-	rm -rf $(d_bin)/$(PF)/include/obstack.h
+	rm -f $(d_bin)/$(PF)/include/obstack.h
 	rm -f $(d_doc)/$(PF)/share/info/configure.* $(d_doc)/$(PF)/share/info/standards.*
 
-ifneq (,$(filter $(DEB_HOST_ARCH),powerpc ppc64el))
+ifneq (,$(filter $(DEB_HOST_ARCH),powerpc ppc64 ppc64el))
 	rm -f $(d_bin)/$(PF)/bin/embedspu
 endif
 
@@ -1214,9 +1096,11 @@ ifeq ($(with_multiarch),yes)
 
 	rm -f $(d_mul)/$(PF)/bin/gprofng
 	rm -f $(d_mul)/$(PF)/bin/gp-*
+	rm -f $(d_mul)/$(PF)/bin/gprofng-*
 	rm -rf $(d_mul)/$(PF)/lib/*/gprofng
+	rm -rf $(d_mul)/$(PF)/share/doc/gprofng
 
-  ifneq (,$(filter $(DEB_HOST_ARCH),powerpc ppc64el))
+  ifneq (,$(filter $(DEB_HOST_ARCH),powerpc ppc64 ppc64el))
 	rm -f $(d_mul)/$(PF)/bin/embedspu
   endif
 	rm -rf $(d_mul)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/ldscripts
@@ -1226,6 +1110,13 @@ endif
 #	rm -rf debian/binutils-*-*-*/$(PF)/lib/$(DEB_HOST_MULTIARCH)/ldscripts \
 #	  debian/binutils-*-gnu/$(PF)/lib/$(DEB_HOST_MULTIARCH)/ldscripts
 
+	$(install_dir) $(d_sfrd)/$(PF)/include
+	mv $(d_bin)/$(PF)/include/sframe*.h $(d_sfrd)/$(PF)/include/
+
+ifeq ($(with_gprofng),yes)
+	$(install_dir) $(d_gpnd)/$(PF)/include
+	mv $(d_bin)/$(PF)/include/*collector*.h $(d_gpnd)/$(PF)/include/
+endif
 	$(install_dir) $(d_dev)/$(PF)/include
 	mv $(d_bin)/$(PF)/include/* $(d_dev)/$(PF)/include/
 
@@ -1241,7 +1132,19 @@ ifeq ($(with_gprofng),yes)
 		$(d_gpng)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/.
 	mv $(d_bin)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/gprofng/libgp-*.so \
 		$(d_gpng)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/gprofng/.
+
+	$(install_dir) $(d_gpnd)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/gprofng
+	mv $(d_bin)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/libgprofng.so \
+		$(d_gpnd)/$(PF)/lib/$(DEB_HOST_MULTIARCH)
+	mv $(d_bin)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/libgprofng.a \
+		$(d_gpnd)/$(PF)/lib/$(DEB_HOST_MULTIARCH)
+	mv $(d_bin)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/gprofng/*.a \
+		$(d_gpnd)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/gprofng
 endif
+	$(install_dir) $(d_sfrd)/$(PF)/lib/$(DEB_HOST_MULTIARCH)
+	mv $(d_bin)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/libsframe.a \
+	   $(d_bin)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/libsframe.so \
+		$(d_sfrd)/$(PF)/lib/$(DEB_HOST_MULTIARCH)
 
 	$(install_dir) $(d_lib)/$(PF)/lib/$(DEB_HOST_MULTIARCH) $(d_dev)/$(PF)/lib/$(DEB_HOST_MULTIARCH)
 	mv $(d_bin)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/*.a \
@@ -1249,12 +1152,11 @@ endif
 	   $(d_bin)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/libopcodes.so \
 	   $(d_bin)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/libctf*.so \
 		$(d_dev)/$(PF)/lib/$(DEB_HOST_MULTIARCH)
-	mv $(d_bin)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/libsframe.so \
-		$(d_dev)/$(PF)/lib/$(DEB_HOST_MULTIARCH)
-ifeq ($(with_gprofng),yes)
-	mv $(d_bin)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/libgprofng.so \
-		$(d_dev)/$(PF)/lib/$(DEB_HOST_MULTIARCH)
-endif
+	cp builddir-pic/opcodes/.libs/libopcodes.a \
+		$(d_dev)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/libopcodes_pic.a
+	cp builddir-pic/bfd/.libs/libbfd.a \
+		$(d_dev)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/libbfd_pic.a
+
 	mv $(d_bin)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/*.so \
 	   $(d_lib)/$(PF)/lib/$(DEB_HOST_MULTIARCH)
 	$(install_dir) $(d_sfrm)/$(PF)/lib/$(DEB_HOST_MULTIARCH)
@@ -1304,7 +1206,14 @@ ifeq ($(with_multiarch),yes)
 	$(call strip_package, $(p_mul), $(d_mul))
 endif
 
-	for i in $(d_dev)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/*.a; do \
+	for i in \
+	  $(d_dev)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/*.a \
+	  $(d_sfrd)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/*.a \
+	  $(if $(filter yes, $(with_gprofng)), \
+	      $(d_gpnd)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/*.a \
+	      $(d_gpnd)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/gprofng/*.a \
+	  ); \
+	do \
 	  echo "lto-stripping $(basename $$i) ..."; \
 	  $(STRIP_LTO) $$i; \
 	  if which strip-nondeterminism >/dev/null 2>&1; then \
@@ -1370,25 +1279,29 @@ endif
 	rmdir $(d_bin)/$(PF)/include/
 
 ifeq ($(with_gprofng),yes)
-	$(install_dir) $(d_com)/etc
-	mv $(d_bin)/etc/gprofng.rc $(d_com)/etc/.
+	: # Remove the gp-* compat symlinks
+	rm -f $(PF)/bin/gp-*
 endif
-
 	: # Rename non-prefixed binaries to $(DEB_HOST_GNU_TYPE)- prefixed binaries
 	: # and provide symlinks to the prefixed binaries.
 	$(install_dir) $(d_nat)/$(PF)/bin $(d_nat)/$(PF)/share/man/man1
-	for i in $(programs); do \
+	for i in $(binutils_programs); do \
 	  mv $(d_bin)/$(PF)/bin/$$i $(d_nat)/$(PF)/bin/$(DEB_HOST_GNU_TYPE)-$$i; \
 	  ln -sf $(DEB_HOST_GNU_TYPE)-$$i $(d_bin)/$(PF)/bin/$$i; \
 	done
 ifeq ($(with_gold),yes)
 	ln -sf $(DEB_HOST_GNU_TYPE)-ld.gold $(d_nat)/usr/bin/$(DEB_HOST_GNU_TYPE)-gold
 endif
-	for i in $(programs); do \
+	for i in $(binutils_programs); do \
 	  ln -sf $$i.1.gz $(d_nat)/$(PF)/share/man/man1/$(DEB_HOST_GNU_TYPE)-$$i.1.gz; \
 	done
 ifeq ($(with_native),yes)
 	$(call strip_package, $(p_nat), $(d_nat))
+  ifeq ($(with_gprofng),yes)
+	$(call strip_package, $(p_bin), $(d_bin))
+  endif
+	$(install_dir) $(d_bin)-dbg/usr/share/doc/
+	ln -sf binutils $(d_bin)-dbg/usr/share/doc/$(p_bin)-dbg
 endif
 ifeq ($(with_multiarch),yes)
 	for i in \
@@ -1398,32 +1311,6 @@ ifeq ($(with_multiarch),yes)
 	  mv $(d_mul)/$(PF)/bin/$$i $(d_mul)/$(PF)/bin/$(DEB_HOST_GNU_TYPE)-$$i; \
 	done
 	rm -f $(d_mul)/$(PF)/bin/embedspu
-endif
-
-ifneq (,$(filter $(DEB_HOST_ARCH),i386 kfreebsd-i386 hurd-i386))
-# temporary i586-* symlinks for stretch/sid
-  ifneq (,$(TRIPLET_SYMLINK))
-	for i in $(programs); do \
-	  ln -sf $(DEB_HOST_GNU_TYPE)-$$i $(d_nat)/$(PF)/bin/$(TRIPLET_SYMLINK)-$$i; \
-	  ln -sf $(DEB_HOST_GNU_TYPE)-$$i.1.gz $(d_nat)/$(PF)/share/man/man1/$(TRIPLET_SYMLINK)-$$i.1.gz; \
-	done
-  endif
-# temporary i486-* symlinks for jessie/sid
-  ifeq ($(DEB_HOST_GNU_CPU),i586)
-	gnutype=$(subst i586,i486,$(DEB_HOST_GNU_TYPE)); \
-	for i in $(programs); do \
-	  ln -sf $(DEB_HOST_GNU_TYPE)-$$i $(d_nat)/$(PF)/bin/$$gnutype-$$i; \
-	  ln -sf $(DEB_HOST_GNU_TYPE)-$$i.1.gz $(d_nat)/$(PF)/share/man/man1/$$gnutype-$$i.1.gz; \
-	done
-  endif
-# for backports to wheezy and squeeze
-  ifeq ($(DEB_HOST_GNU_CPU),i486)
-	gnutype=$(subst i486,i586,$(DEB_HOST_GNU_TYPE)); \
-	for i in $(programs); do \
-	  ln -sf $(DEB_HOST_GNU_TYPE)-$$i $(d_nat)/$(PF)/bin/$$gnutype-$$i; \
-	  ln -sf $(DEB_HOST_GNU_TYPE)-$$i.1.gz $(d_nat)/$(PF)/share/man/man1/$$gnutype-$$i.1.gz; \
-	done
-  endif
 endif
 	touch $@
 
@@ -1586,7 +1473,7 @@ binary.%: stamps/install.% install
 	sed 's/@PKG@/$(P_CROSS)/' debian/binutils-cross.overrides \
 	  > $(D_CROSS)/$(PF)/share/lintian/overrides/$(P_CROSS)
 
-	: # install maintainer scrtips
+	: # install maintainer scripts
 	$(install_dir) $(D_CROSS)/$(PF)/share/doc/$(P_CROSS)
 	$(install_file)	debian/changelog \
 	  $(D_CROSS)/$(PF)/share/doc/$(P_CROSS)/changelog.Debian
@@ -1621,11 +1508,7 @@ endif
 	$(install_file) debian/binutils.triggers $(D_CROSS)/DEBIAN/triggers
 
 	rm -f debian/substvars
-ifeq ($(DEB_HOST_ARCH),sw64)
-	dpkg-shlibdeps $(D_CROSS)/$(PF)/bin/* -l$(d_lib)/$(PF)/lib/$(DEB_HOST_MULTIARCH) --ignore-missing-info
-else
 	dpkg-shlibdeps $(D_CROSS)/$(PF)/bin/* -l$(d_lib)/$(PF)/lib/$(DEB_HOST_MULTIARCH)
-endif
 	dpkg-gencontrol -P$(D_CROSS) -p$(P_CROSS) \
 		-VBuilt-Using="$(shell dpkg-query -f '$${source:Package} (= $${source:Version}), ' -W binutils-source)"
 	cd $(D_CROSS) && find -type f  ! -regex './DEBIAN/.*' -printf '%P\n' | LC_ALL=C sort | xargs md5sum > DEBIAN/md5sums
@@ -1680,13 +1563,8 @@ ifneq (,$(TARGET))
 	done
 
 	rm -f debian/substvars
-ifeq ($(DEB_HOST_ARCH),sw64)
-	dpkg-shlibdeps $(d_cross)/$(PF)/bin/* \
-	  -ldebian/tmp/$(PF)/lib/$(DEB_TARGET_MULTIARCH) -l$(d_lib)/$(PF)/lib/$(DEB_TARGET_MULTIARCH) --ignore-missing-info
-else
 	dpkg-shlibdeps $(d_cross)/$(PF)/bin/* \
 	  -ldebian/tmp/$(PF)/lib/$(DEB_TARGET_MULTIARCH) -l$(d_lib)/$(PF)/lib/$(DEB_TARGET_MULTIARCH)
-endif
 	dpkg-gencontrol -P$(d_cross) -p$(p_cross) \
 		-VBuilt-Using="$(shell dpkg-query -f '$${source:Package} (= $${source:Version}), ' -W binutils-source)"
 	find $(d_cross) -depth -newermt '$(BUILD_DATE)' -print0 | \
@@ -1752,7 +1630,8 @@ ifeq ($(with_hppa64),yes)
 endif
 
 	: # install maintainer scripts
-	$(install_dir) $(d_bin)/DEBIAN
+	$(install_dir) $(d_bin)/DEBIAN $(d_bin)-dbg/DEBIAN
+	$(install_script) debian/binutils.preinst $(d_bin)/DEBIAN/preinst
 
 	$(install_dir) $(d_lib)/DEBIAN $(d_lib)-dbg/DEBIAN
 	$(install_file) debian/binutils.triggers $(d_lib)/DEBIAN/triggers
@@ -1760,26 +1639,31 @@ endif
 
 	$(install_dir) $(d_ctf)/DEBIAN $(d_ctf)-dbg/DEBIAN
 	$(install_file) debian/binutils.triggers $(d_ctf)/DEBIAN/triggers
-	$(install_file) debian/libctf0.shlibs $(d_ctf)/DEBIAN/shlibs
-	$(install_file) debian/libctf0.symbols $(d_ctf)/DEBIAN/symbols
+	$(install_file) debian/$(p_ctf).shlibs $(d_ctf)/DEBIAN/shlibs
+	$(install_file) debian/$(p_ctf).symbols $(d_ctf)/DEBIAN/symbols
 
 	$(install_dir) $(d_ctfn)/DEBIAN $(d_ctfn)-dbg/DEBIAN
 	$(install_file) debian/binutils.triggers $(d_ctfn)/DEBIAN/triggers
-	$(install_file) debian/libctf-nobfd0.shlibs $(d_ctfn)/DEBIAN/shlibs
-	$(install_file) debian/libctf-nobfd0.symbols $(d_ctfn)/DEBIAN/symbols
-
-ifeq ($(with_gprofng),yes)
-	$(install_dir) $(d_gpng)/DEBIAN $(d_gpng)-dbg/DEBIAN
-	$(install_file) debian/binutils.triggers $(d_gpng)/DEBIAN/triggers
-	$(install_file) debian/libgprofng0.shlibs $(d_gpng)/DEBIAN/shlibs
+	$(install_file) debian/$(p_ctfn).shlibs $(d_ctfn)/DEBIAN/shlibs
+	$(install_file) debian/$(p_ctfn).symbols $(d_ctfn)/DEBIAN/symbols
 
 	$(install_dir) $(d_com)/DEBIAN
 	$(install_file) debian/binutils-common.conffiles $(d_com)/DEBIAN/conffiles
+
+ifeq ($(with_gprofng),yes)
+	$(install_dir) $(d_gpng)/DEBIAN $(d_gpnd)/DEBIAN $(d_gpng)-dbg/DEBIAN
+	$(install_file) debian/binutils.triggers $(d_gpng)/DEBIAN/triggers
+	$(install_file) debian/$(p_gpng).shlibs $(d_gpng)/DEBIAN/shlibs
+	$(install_file) debian/$(p_gpng).symbols $(d_gpng)/DEBIAN/symbols
+
+	$(install_file) debian/binutils.conffiles $(d_bin)/DEBIAN/conffiles
 endif
 	$(install_dir) $(d_sfrm)/DEBIAN $(d_sfrm)-dbg/DEBIAN
 	$(install_file) debian/binutils.triggers $(d_sfrm)/DEBIAN/triggers
-	$(install_file) debian/libsframe1.shlibs $(d_sfrm)/DEBIAN/shlibs
-	$(install_file) debian/libsframe1.symbols $(d_sfrm)/DEBIAN/symbols
+	$(install_file) debian/$(p_sfrm).shlibs $(d_sfrm)/DEBIAN/shlibs
+	$(install_file) debian/$(p_sfrm).symbols $(d_sfrm)/DEBIAN/symbols
+
+	$(install_dir) $(d_sfrd)/DEBIAN
 
 	$(install_dir) $(d_nat)/DEBIAN $(d_nat)-dbg/DEBIAN
 
@@ -1823,10 +1707,16 @@ endif
 ifeq ($(with_gprofng),yes)
 	$(install_dir) $(d_gpng)/$(PF)/share/doc/
 	ln -sf $(p_lib) $(d_gpng)/$(PF)/share/doc/$(p_gpng)
+
+	$(install_dir) $(d_gpnd)/$(PF)/share/doc/
+	ln -sf $(p_gpng) $(d_gpnd)/$(PF)/share/doc/$(p_gpnd)
 endif
 	$(install_dir) $(d_sfrm)/$(PF)/share/doc/$(p_sfrm)
 	$(install_file) debian/changelog $(d_sfrm)/$(PF)/share/doc/$(p_sfrm)/changelog.Debian
 	$(install_file) debian/copyright $(d_sfrm)/$(PF)/share/doc/$(p_sfrm)/
+
+	$(install_dir) $(d_sfrd)/$(PF)/share/doc/
+	ln -sf $(p_sfrm) $(d_sfrd)/$(PF)/share/doc/$(p_sfrd)
 
 	$(install_dir) $(d_nat)/$(PF)/share/doc/
 	ln -sf $(p_lib) $(d_nat)/$(PF)/share/doc/$(p_nat)
@@ -1900,21 +1790,15 @@ endif
 	find $(d_com)/$(PF)/share/doc/$(p_bin)/ -type f ! -name bbconv.pl | xargs gzip -9n
 	gzip -9n $(d_com)/$(PF)/share/doc/$(p_com)/changelog.Debian
 	gzip -9n $(d_com)/$(PF)/share/man/man1/*.1
+ifeq ($(with_gprofng),yes)
+	gzip -9n $(d_bin)/$(PF)/share/man/man1/*.1
+endif
 
 	gzip -9n $(d_sfrm)/$(PF)/share/doc/$(p_sfrm)/changelog.Debian
 
 	: # Finish it all up
-	dpkg-gencontrol -P$(d_bin) -p$(p_bin) \
-		$(CONFLICTS_TARGET_$(DEB_HOST_ARCH)) $(gold_provides) \
-		-Vbinutils:native=$(p_nat)
-	cd $(d_bin) && find -type f  ! -regex './DEBIAN/.*' -printf '%P\n' | LC_ALL=C sort | xargs md5sum > DEBIAN/md5sums
-
 	rm -f debian/substvars
-ifeq ($(DEB_HOST_ARCH),sw64)
-	find $(d_lib) -type f | xargs file | grep ELF | cut -d: -f 1 | xargs dpkg-shlibdeps --ignore-missing-info
-else
 	find $(d_lib) -type f | xargs file | grep ELF | cut -d: -f 1 | xargs dpkg-shlibdeps
-endif
 	dpkg-gencontrol -P$(d_lib) -p$(p_lib)
 	cd $(d_lib) && find -type f  ! -regex './DEBIAN/.*' -printf '%P\n' | LC_ALL=C sort | xargs md5sum > DEBIAN/md5sums
 	dpkg-gencontrol -P$(d_lib)-dbg -p$(p_lib)-dbg
@@ -1928,22 +1812,14 @@ endif
 	dpkg-gensymbols -P$(d_sfrm) -p$(p_sfrm)
 
 	rm -f debian/substvars
-ifeq ($(DEB_HOST_ARCH),sw64)
-	find $(d_ctf) -type f | xargs file | grep ELF | cut -d: -f 1 | xargs dpkg-shlibdeps --ignore-missing-info
-else
 	find $(d_ctf) -type f | xargs file | grep ELF | cut -d: -f 1 | xargs dpkg-shlibdeps
-endif
 	dpkg-gencontrol -P$(d_ctf) -p$(p_ctf)
 	cd $(d_ctf) && find -type f  ! -regex './DEBIAN/.*' -printf '%P\n' | LC_ALL=C sort | xargs md5sum > DEBIAN/md5sums
 	dpkg-gencontrol -P$(d_ctf)-dbg -p$(p_ctf)-dbg
 	cd $(d_ctf)-dbg && find -type f  ! -regex './DEBIAN/.*' -printf '%P\n' | LC_ALL=C sort | xargs md5sum > DEBIAN/md5sums
 
 	rm -f debian/substvars
-ifeq ($(DEB_HOST_ARCH),sw64)
-	find $(d_ctfn) -type f | xargs file | grep ELF | cut -d: -f 1 | xargs dpkg-shlibdeps --ignore-missing-info
-else
 	find $(d_ctfn) -type f | xargs file | grep ELF | cut -d: -f 1 | xargs dpkg-shlibdeps
-endif
 	dpkg-gencontrol -P$(d_ctfn) -p$(p_ctfn)
 	cd $(d_ctfn) && find -type f  ! -regex './DEBIAN/.*' -printf '%P\n' | LC_ALL=C sort | xargs md5sum > DEBIAN/md5sums
 	dpkg-gencontrol -P$(d_ctfn)-dbg -p$(p_ctfn)-dbg
@@ -1951,27 +1827,40 @@ endif
 
 ifeq ($(with_gprofng),yes)
 	rm -f debian/substvars
-ifeq ($(DEB_HOST_ARCH),sw64)
-	find $(d_gpng) -type f | xargs file | grep ELF | cut -d: -f 1 | xargs dpkg-shlibdeps --ignore-missing-info
-else
 	find $(d_gpng) -type f | xargs file | grep ELF | cut -d: -f 1 | xargs dpkg-shlibdeps
-endif
 	dpkg-gencontrol -P$(d_gpng) -p$(p_gpng)
+
+	rm -f debian/substvars
 	cd $(d_gpng) && find -type f  ! -regex './DEBIAN/.*' -printf '%P\n' | LC_ALL=C sort | xargs md5sum > DEBIAN/md5sums
+	dpkg-gencontrol -P$(d_gpnd) -p$(p_gpnd)
+	cd $(d_gpnd) && find -type f  ! -regex './DEBIAN/.*' -printf '%P\n' | LC_ALL=C sort | xargs md5sum > DEBIAN/md5sums
 	dpkg-gencontrol -P$(d_gpng)-dbg -p$(p_gpng)-dbg
 	cd $(d_gpng)-dbg && find -type f  ! -regex './DEBIAN/.*' -printf '%P\n' | LC_ALL=C sort | xargs md5sum > DEBIAN/md5sums
 endif
 
-	rm -f debian/substvars
-ifeq ($(DEB_HOST_ARCH),sw64)
-	find $(d_sfrm) -type f | xargs file | grep ELF | cut -d: -f 1 | xargs dpkg-shlibdeps --ignore-missing-info
-else
-	find $(d_sfrm) -type f | xargs file | grep ELF | cut -d: -f 1 | xargs dpkg-shlibdeps
+	: # binutils only has binaries when gprofng is built
+ifeq ($(with_gprofng),yes)
+	find $(d_bin) -type f | xargs file | grep ELF | cut -d: -f 1 | xargs dpkg-shlibdeps
 endif
+	dpkg-gencontrol -P$(d_bin) -p$(p_bin) \
+		$(CONFLICTS_TARGET_$(DEB_HOST_ARCH)) $(gold_substvars) \
+		-Vbinutils:native=$(p_nat)
+	cd $(d_bin) && find -type f  ! -regex './DEBIAN/.*' -printf '%P\n' | LC_ALL=C sort | xargs md5sum > DEBIAN/md5sums
+
+	rm -f debian/substvars
+	dpkg-gencontrol -P$(d_bin)-dbg -p$(p_bin)-dbg -Vbinutils:native=$(p_nat)
+	cd $(d_bin)-dbg && find -type f  ! -regex './DEBIAN/.*' -printf '%P\n' | LC_ALL=C sort | xargs md5sum > DEBIAN/md5sums
+
+	rm -f debian/substvars
+	find $(d_sfrm) -type f | xargs file | grep ELF | cut -d: -f 1 | xargs dpkg-shlibdeps
 	dpkg-gencontrol -P$(d_sfrm) -p$(p_sfrm)
 	cd $(d_sfrm) && find -type f  ! -regex './DEBIAN/.*' -printf '%P\n' | LC_ALL=C sort | xargs md5sum > DEBIAN/md5sums
 	dpkg-gencontrol -P$(d_sfrm)-dbg -p$(p_sfrm)-dbg
 	cd $(d_sfrm)-dbg && find -type f  ! -regex './DEBIAN/.*' -printf '%P\n' | LC_ALL=C sort | xargs md5sum > DEBIAN/md5sums
+
+	rm -f debian/substvars
+	dpkg-gencontrol -P$(d_sfrd) -p$(p_sfrd)
+	cd $(d_sfrd) && find -type f  ! -regex './DEBIAN/.*' -printf '%P\n' | LC_ALL=C sort | xargs md5sum > DEBIAN/md5sums
 
 	rm -f debian/substvars
 	mkdir -p $(d_com)/DEBIAN
@@ -1979,12 +1868,9 @@ endif
 	cd $(d_com) && find -type f ! -regex './DEBIAN/.*' -printf '%P\n' | LC_ALL=C sort | xargs md5sum > DEBIAN/md5sums
 
 	rm -f debian/substvars
-ifeq ($(DEB_HOST_ARCH),sw64)
-	find $(d_nat) -type f | xargs file | grep ELF | cut -d: -f 1 | xargs dpkg-shlibdeps -l$(d_lib)/$(PF)/lib/$(DEB_HOST_MULTIARCH) --ignore-missing-info
-else
 	find $(d_nat) -type f | xargs file | grep ELF | cut -d: -f 1 | xargs dpkg-shlibdeps -l$(d_lib)/$(PF)/lib/$(DEB_HOST_MULTIARCH)
-endif
-	dpkg-gencontrol -P$(d_nat) -p$(p_nat) -VextraDepends='libbinutils (= $${binary:Version})'
+	dpkg-gencontrol -P$(d_nat) -p$(p_nat) $(goldnat_substvars) \
+		-VextraDepends='libbinutils (= $${binary:Version})'
 	cd $(d_nat) && find -type f  ! -regex './DEBIAN/.*' -printf '%P\n' | LC_ALL=C sort | xargs md5sum > DEBIAN/md5sums
 	dpkg-gencontrol -P$(d_nat)-dbg -p$(p_nat)-dbg -VextraDepends='libbinutils (= $${binary:Version})'
 	cd $(d_nat)-dbg && find -type f  ! -regex './DEBIAN/.*' -printf '%P\n' | LC_ALL=C sort | xargs md5sum > DEBIAN/md5sums
@@ -1995,11 +1881,7 @@ endif
 
 ifeq ($(with_multiarch),yes)
 	rm -f debian/substvars
-ifeq ($(DEB_HOST_ARCH),sw64)
-	find $(d_mul) -type f | xargs file | grep ELF | cut -d: -f 1 | xargs dpkg-shlibdeps --ignore-missing-info
-else
 	find $(d_mul) -type f | xargs file | grep ELF | cut -d: -f 1 | xargs dpkg-shlibdeps
-endif
 	dpkg-gencontrol -P$(d_mul) -p$(p_mul)
 	cd $(d_mul) && find -type f  ! -regex './DEBIAN/.*' -printf '%P\n' | LC_ALL=C sort | xargs md5sum > DEBIAN/md5sums
 	dpkg-gencontrol -P$(d_mul)-dbg -p$(p_mul)-dbg
@@ -2013,19 +1895,15 @@ endif
 
 ifeq ($(with_hppa64),yes)
 	rm -f debian/substvars
-ifeq ($(DEB_HOST_ARCH),sw64)
-	find $(d_hppa64) -type f | xargs file | grep ELF | cut -d: -f 1 | xargs dpkg-shlibdeps --ignore-missing-info
-else
 	find $(d_hppa64) -type f | xargs file | grep ELF | cut -d: -f 1 | xargs dpkg-shlibdeps
-endif
 	dpkg-gencontrol -P$(d_hppa64) -p$(p_hppa64)
 	cd $(d_hppa64) && find -type f  ! -regex './DEBIAN/.*' -printf '%P\n' | LC_ALL=C sort | xargs md5sum > DEBIAN/md5sums
 	dpkg-gencontrol -P$(d_hppa64)-dbg -p$(p_hppa64)-dbg
 	cd $(d_hppa64)-dbg && find -type f  ! -regex './DEBIAN/.*' -printf '%P\n' | LC_ALL=C sort | xargs md5sum > DEBIAN/md5sums
 endif
 
-	$(CHOWN) -R root:root $(d_bin) $(d_com) $(d_lib) $(d_lib)-dbg $(d_ctf) $(d_ctf)-dbg $(d_ctfn) $(d_ctfn)-dbg $(d_nat) $(d_nat)-dbg $(d_dev) $(d_sfrm) $(d_sfrm)-dbg
-	chmod -R go=rX  $(d_bin) $(d_com) $(d_lib) $(d_lib)-dbg $(d_ctf) $(d_ctf)-dbg $(d_ctfn) $(d_ctfn)-dbg $(d_nat) $(d_nat)-dbg $(d_dev) $(d_sfrm) $(d_sfrm)-dbg
+	$(CHOWN) -R root:root $(d_bin) $(d_com) $(d_lib) $(d_lib)-dbg $(d_ctf) $(d_ctf)-dbg $(d_ctfn) $(d_ctfn)-dbg $(d_nat) $(d_nat)-dbg $(d_dev) $(d_sfrm) $(d_sfrm)-dbg $(d_sfrd)
+	chmod -R go=rX  $(d_bin) $(d_com) $(d_lib) $(d_lib)-dbg $(d_ctf) $(d_ctf)-dbg $(d_ctfn) $(d_ctfn)-dbg $(d_nat) $(d_nat)-dbg $(d_dev) $(d_sfrm) $(d_sfrm)-dbg $(d_sfrd)
 	find $(d_bin) -depth -newermt '$(BUILD_DATE)' -print0 | \
 		xargs -0r touch --no-dereference --date='$(BUILD_DATE)'
 	$(DPKG_DEB) --build $(d_bin) ..
@@ -2045,21 +1923,30 @@ endif
 		xargs -0r touch --no-dereference --date='$(BUILD_DATE)'
 	$(DPKG_DEB) --build $(d_ctfn)-dbg ..
 ifeq ($(with_gprofng),yes)
-	$(CHOWN) -R root:root $(d_gpng) $(d_gpng)-dbg
-	chmod -R go=rX  $(d_gpng) $(d_gpng)-dbg
+	$(CHOWN) -R root:root $(d_gpng) $(d_gpnd) $(d_gpng)-dbg $(d_bin)-dbg
+	chmod -R go=rX  $(d_gpng) $(d_gpnd) $(d_gpng)-dbg $(d_bin)-dbg
 	find $(d_gpng) -depth -newermt '$(BUILD_DATE)' -print0 | \
 		xargs -0r touch --no-dereference --date='$(BUILD_DATE)'
 	$(DPKG_DEB) --build $(d_gpng) ..
+	find $(d_gpnd) -depth -newermt '$(BUILD_DATE)' -print0 | \
+		xargs -0r touch --no-dereference --date='$(BUILD_DATE)'
+	$(DPKG_DEB) --build $(d_gpnd) ..
 	find $(d_gpng)-dbg -depth -newermt '$(BUILD_DATE)' -print0 | \
 		xargs -0r touch --no-dereference --date='$(BUILD_DATE)'
 	$(DPKG_DEB) --build $(d_gpng)-dbg ..
 endif
+	find $(d_bin)-dbg -depth -newermt '$(BUILD_DATE)' -print0 | \
+		xargs -0r touch --no-dereference --date='$(BUILD_DATE)'
+	$(DPKG_DEB) --build $(d_bin)-dbg ..
 	find $(d_sfrm) -depth -newermt '$(BUILD_DATE)' -print0 | \
 		xargs -0r touch --no-dereference --date='$(BUILD_DATE)'
 	$(DPKG_DEB) --build $(d_sfrm) ..
 	find $(d_sfrm)-dbg -depth -newermt '$(BUILD_DATE)' -print0 | \
 		xargs -0r touch --no-dereference --date='$(BUILD_DATE)'
 	$(DPKG_DEB) --build $(d_sfrm)-dbg ..
+	find $(d_sfrd) -depth -newermt '$(BUILD_DATE)' -print0 | \
+		xargs -0r touch --no-dereference --date='$(BUILD_DATE)'
+	$(DPKG_DEB) --build $(d_sfrd) ..
 	find $(d_lib) -depth -newermt '$(BUILD_DATE)' -print0 | \
 		xargs -0r touch --no-dereference --date='$(BUILD_DATE)'
 	$(DPKG_DEB) --build $(d_lib) ..
@@ -2133,19 +2020,22 @@ define strip_package
 	  $(strip $2)/$(PF)/lib/$(DEB_HOST_MULTIARCH)/libgprofng.so.0.0.0 \
 	  $(strip $2)/$(PF)/lib/*/gprofng/libgp-*.so \
 	  $(strip $2)/$(PF)/lib/*/libgprofng.so.0.0 \
-	  $(strip $2)/$(PF)/lib/*/libsframe.so.1.0.0 \
+	  $(strip $2)/$(PF)/lib/*/libsframe.so.3.0.0 \
 	  $$(file $(strip $2)/$(PF)/bin/* |awk -F: '$$0 !~ /script/ {print $$1}'); \
 	do \
 	  test ! -h $$i || continue; test -f $$i || continue; \
 	  files="$$files $$i"; \
 	  nfiles=$$(expr $$nfiles + 1); \
 	done; \
+	echo "Strip ($$nfiles): $$files"; \
 	for i in $$files; do \
 	  id=$$(debugedit --build-id --build-id-seed='$(strip $1)-$(DEB_VERSION)' $$i); \
 	done; \
 	mkdir -p $(strip $2)-dbg/usr/lib/debug/.dwz/$(DEB_HOST_MULTIARCH); \
 	dwz=usr/lib/debug/.dwz/$(DEB_HOST_MULTIARCH)/$(strip $1).debug; \
-	if [ $$nfiles -gt 1 ]; then \
+	if [ $$nfiles -eq 0 ]; then \
+	  : ; \
+	elif [ $$nfiles -gt 1 ]; then \
 	  dwz -m $(strip $2)-dbg/$$dwz -M /$$dwz $$files; \
 	  $(CROSS)objcopy --compress-debug-sections $(strip $2)-dbg/$$dwz; \
 	else \

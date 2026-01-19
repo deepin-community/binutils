@@ -3,29 +3,32 @@ Section: devel
 Priority: optional
 Maintainer: Matthias Klose <doko@debian.org>
 Uploaders: James Troup <binutils@elmo.tasta.io>
-Standards-Version: 4.6.2
+Standards-Version: 4.7.2
 Build-Depends: autoconf (>= 2.64), @dpkg_dev@
   bison, flex, gettext, texinfo, dejagnu, quilt, chrpath, dwz, debugedit (>= 4.16),
   python3:any, file, xz-utils, lsb-release, zlib1g-dev, procps, help2man,
-  libjansson-dev, pkg-config, libzstd-dev,
-  g++-aarch64-linux-gnu [amd64 i386 x32] <!nocheck>,
-  g++-arm-linux-gnueabi [amd64 arm64 i386 x32] <!nocheck>,
-  g++-arm-linux-gnueabihf [amd64 arm64 i386 x32] <!nocheck>,
-  g++-powerpc64le-linux-gnu [amd64 arm64 i386 ppc64 x32] <!nocheck>,
-  g++-s390x-linux-gnu [amd64 arm64 i386 ppc64el x32] <!nocheck>,
-  g++-hppa-linux-gnu [amd64 i386 x32] <!nocheck>,
-  g++-m68k-linux-gnu [amd64 i386 x32] <!nocheck>,
-  g++-powerpc-linux-gnu [amd64 i386 ppc64el x32] <!nocheck>,
-  g++-riscv64-linux-gnu [amd64 arm64 i386 ppc64el x32] <!nocheck>,
-  g++-sh4-linux-gnu [amd64 i386 x32] <!nocheck>,
-  g++-sparc64-linux-gnu [amd64 i386 x32] <!nocheck>,
-  g++-i686-linux-gnu [amd64 arm64 ppc64el x32] <!nocheck>,
-  g++-x86-64-linux-gnu [arm64 i386 ppc64el] <!nocheck>,
-  g++-x86-64-linux-gnux32 [amd64 arm64 i386 ppc64el] <!nocheck>,
+  libjansson-dev, pkgconf, libzstd-dev,
+  default-jdk-headless [amd64 arm64 i386 riscv64 x32] <!pkg.binutils.nojava>,
+#  g++-aarch64-linux-gnu [amd64 i386 ppc64el s390x x32] <!nocheck>,
+#  g++-arm-linux-gnueabi [amd64 arm64 i386 x32] <!nocheck>,
+#  g++-arm-linux-gnueabihf [amd64 arm64 i386 ppc64el s390x x32] <!nocheck>,
+#  g++-powerpc64le-linux-gnu [amd64 arm64 i386 ppc64 s390x x32] <!nocheck>,
+#  g++-s390x-linux-gnu [amd64 arm64 i386 ppc64el x32] <!nocheck>,
+#  g++-alpha-linux-gnu [amd64 i386 x32] <!nocheck>,
+#  g++-hppa-linux-gnu [amd64 i386 x32] <!nocheck>,
+#  g++-m68k-linux-gnu [amd64 i386 x32] <!nocheck>,
+#  g++-powerpc-linux-gnu [amd64 i386 ppc64el s390x x32] <!nocheck>,
+#  g++-powerpc64-linux-gnu [amd64 i386 s390x x32] <!nocheck>,
+#  g++-riscv64-linux-gnu [amd64 arm64 i386 ppc64el s390x x32] <!nocheck>,
+#  g++-sh4-linux-gnu [amd64 i386 x32] <!nocheck>,
+#  g++-sparc64-linux-gnu [amd64 i386 x32] <!nocheck>,
+#  g++-i686-linux-gnu [amd64 arm64 ppc64el s390x x32] <!nocheck>,
+#  g++-x86-64-linux-gnu [arm64 i386 ppc64el s390x] <!nocheck>,
+#  g++-x86-64-linux-gnux32 [amd64 arm64 i386 ppc64el] <!nocheck>,
 Build-Conflicts: libelf-dev
 Rules-Requires-Root: no
 Homepage: https://www.gnu.org/software/binutils/
-Vcs-Browser: https://salsa.debian.org/toolchain-team/binutils/tree/binutils-2.41
+Vcs-Browser: https://salsa.debian.org/toolchain-team/binutils
 Vcs-Git: https://salsa.debian.org/toolchain-team/binutils.git
 XS-Testsuite: autopkgtest
 
@@ -56,15 +59,36 @@ Description: GNU assembler, linker and binary utilities for the build architectu
 Package: binutils
 Architecture: any
 Depends: ${shlibs:Depends}, binutils-common (= ${binary:Version}),
-  libbinutils (= ${binary:Version}), ${binutils:native} (= ${binary:Version})
+  libbinutils (= ${binary:Version}), ${binutils:native} (= ${binary:Version}),
+  ${gold:Depends},
 Conflicts: modutils (<< 2.4.19-1), ${extraConflicts},
   binutils-multiarch (<< 2.27-8)
 Provides: elf-binutils, ${gold:Provides}
-Suggests: binutils-doc (>= ${source:Version}), gprofng-gui
+Suggests: binutils-doc (>= ${source:Version}),
+  gprofng-gui [@gprofng_archs@], ${gold:Suggests},
+Breaks:
+ binutils-aarch64-linux-gnu (<< 2.43.90),
+ binutils-i686-linux-gnu (<< 2.43.90),
+ binutils-riscv64-linux-gnu (<< 2.43.90),
+ binutils-x86-64-linux-gnu (<< 2.43.90),
+Replaces:
+ binutils-common (<< 2.43.90),
+ binutils-aarch64-linux-gnu (<< 2.43.90),
+ binutils-i686-linux-gnu (<< 2.43.90),
+ binutils-riscv64-linux-gnu (<< 2.43.90),
+ binutils-x86-64-linux-gnu (<< 2.43.90),
 Description: GNU assembler, linker and binary utilities
  The programs in this package are used to assemble, link and manipulate
  binary and object files.  They may be used in conjunction with a compiler
  and various libraries to build programs.
+
+Package: binutils-dbg
+Section: debug
+Priority: optional
+Architecture: any
+Depends: binutils (= ${binary:Version}), ${binutils:native}-dbg (= ${binary:Version})
+Description: GNU assembler, linker and binary utilities(debug symbols)
+ This package provides debug symbols for binutils.
 
 Package: libctf-nobfd0
 Architecture: any
@@ -102,8 +126,22 @@ Description: Compact C Type Format library (debug symbols, BFD dependency)
  This package includes the libctf shared library.  The Compact C Type
  Format (CTF) is a way of representing information about a binary program
 
+Package: libgprofng-dev
+Architecture: @gprofng_archs@
+Multi-Arch: same
+Priority: optional
+Section: libdevel
+Depends: binutils-dev (= ${binary:Version}), libgprofng0 (= ${binary:Version}), ${shlibs:Depends}
+Conflicts: binutils-dev (<< 2.45.50.20251023-1~)
+Replaces: binutils-dev (<< 2.45.50.20251023-1~)
+Description: Library for the GNU Next Generation profiler (development files)
+ Gprofng is the GNU Next Generation profiler for analyzing the performance
+ of Linux applications.
+ .
+ This package includes the libgprofng header files and static library.
+
 Package: libgprofng0
-Architecture: any
+Architecture: @gprofng_archs@
 Multi-Arch: same
 Depends: ${shlibs:Depends}, libbinutils (= ${binary:Version})
 Description: GNU Next Generation profiler (runtime library)
@@ -119,7 +157,7 @@ Description: GNU Next Generation profiler (runtime library)
 
 Package: libgprofng0-dbg
 Section: debug
-Architecture: any
+Architecture: @gprofng_archs@
 Multi-Arch: same
 Depends: libgprofng0 (= ${binary:Version})
 Description: GNU Next Generation profiler (debug symbols)
@@ -128,7 +166,21 @@ Description: GNU Next Generation profiler (debug symbols)
  .
  This package includes the debug symbols for the libgprofng shared library.
 
-Package: libsframe1
+Package: libsframe-dev
+Architecture: any
+Multi-Arch: same
+Priority: optional
+Section: libdevel
+Depends: libsframe3 (= ${binary:Version}), ${shlibs:Depends}
+Conflicts: binutils (<< 2.45-1~)
+Replaces: binutils (<< 2.45-1~)
+Description: Library to handle the SFrame format (development files)
+ SFrame stands for Simple Frame format.  SFrame format keeps track
+ of the minimal necessary information needed for generating stack traces.
+ .
+ This package includes the libsframe header files and static library.
+
+Package: libsframe3
 Architecture: any
 Multi-Arch: same
 Depends: ${shlibs:Depends}
@@ -138,11 +190,11 @@ Description: Library to handle the SFrame format (runtime library)
  .
  This package includes the libsframe shared library.
 
-Package: libsframe1-dbg
+Package: libsframe3-dbg
 Section: debug
 Architecture: any
 Multi-Arch: same
-Depends: libsframe1 (= ${binary:Version})
+Depends: libsframe3 (= ${binary:Version})
 Description: Library to handle the SFrame format (debug symbols)
  SFrame stands for Simple Frame format.  SFrame format keeps track
  of the minimal necessary information needed for generating stack traces.
@@ -171,10 +223,9 @@ Architecture: any
 Priority: optional
 Depends: binutils (= ${binary:Version}), libbinutils (= ${binary:Version}),
   libctf0 (= ${binary:Version}), libctf-nobfd0 (= ${binary:Version}),
-  libsframe1 (= ${binary:Version}),
-Conflicts: libbfd-dev
+Conflicts: libbfd-dev, binutils (<< 2.43.50.20240819)
 Provides: libbfd-dev
-Replaces: libbfd-dev, libc5-dev
+Replaces: libbfd-dev, libc5-dev, binutils (<< 2.43.50.20240819)
 Description: GNU binary utilities (BFD development files)
  This package includes header files and static libraries necessary to build
  programs which use the GNU BFD library, which is part of binutils.  Note
@@ -257,7 +308,7 @@ Architecture: all
 Multi-Arch: foreign
 Priority: optional
 Depends: texinfo, zlib1g-dev, make, python3,
-  libjansson-dev, pkg-config, libzstd-dev,
+  libjansson-dev, pkgconf, libzstd-dev,
 Description: GNU assembler, linker and binary utilities (source)
  This package contains the sources and patches which are needed to
  build binutils.

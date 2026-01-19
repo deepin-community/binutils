@@ -1,115 +1,568 @@
-binutils (2.41-6deepin10) unstable; urgency=medium
+binutils (2.45.50.20260119-1) unstable; urgency=medium
 
-  *  fix CVE-2024-57360 CVE-2024-53589 CVE-2025-0840 CVE-2025-1176 CVE-2025-1178
-         CVE-2025-1182 CVE-2025-3198 CVE-2025-5244 CVE-2025-5245 
-         CVE-2025-7545 CVE-2025-7546 CVE-2025-8225
+  * New upstream snapshot.
+  * Ignore the (XXX -> UNTESTED) regressions on amd64 and arm64.
+  * Fix installation of the libgprofng0 symbols file. Closes: #1125783.
 
- -- zengwei <zengwei1@uniontech.com>  Fri, 31 Oct 2025 16:12:25 +0800
+ -- Matthias Klose <doko@debian.org>  Mon, 19 Jan 2026 06:19:32 +0100
 
-binutils (2.41-6deepin9) unstable; urgency=medium
+binutils (2.45.50.20260116-1) unstable; urgency=medium
 
-  * feat: add sw64 support.
+  * New upstream snapshot.
+  * Bump libsframe soname.
+  * Refresh patches.
 
- -- hudeng <hudeng@deepin.org>  Mon, 21 Jul 2025 16:37:22 +0800
+ -- Matthias Klose <doko@debian.org>  Fri, 16 Jan 2026 16:15:22 +0100
 
-binutils (2.41-6deepin8) unstable; urgency=medium
+binutils (2.45.50.20251209-1) unstable; urgency=medium
 
-  * fix CVE-2024-57360
+  * New upstream snapshot.
+    - Fix PR ld/33702. Closes: #1122125.
+  * Update libgprofng symbols file.
 
- -- zengwei  <zengwei1@uniontech.com>  Fri, 18 Jul 2025 17:20:13 +0800
+ -- Matthias Klose <doko@debian.org>  Tue, 09 Dec 2025 09:47:23 +0100
 
-binutils (2.41-6deepin7) unstable; urgency=medium
+binutils (2.45.50.20251201-1) unstable; urgency=medium
 
-  * Fix slowdown about partial linking.
+  * New upstream snapshot.
+  * Update libgprofng symbols file.
+  * Refresh patches.
 
- -- Xin Wang <wangxin03@loongson.cn>  Tue, 16 Jan 2025 15:33 +0800
+ -- Matthias Klose <doko@debian.org>  Mon, 01 Dec 2025 08:36:50 +0100
 
-binutils (2.41-6deepin6) unstable; urgency=medium
+binutils (2.45.50.20251125-1) unstable; urgency=medium
 
-  * Disable gold linker for MIPS targets as they are broken as of 2.41.
+  * New upstream snapshot, upload to unstable.
+  * Update libgprofng and libsframe symbols files.
 
- -- Mingcong Bai <baimingcong@uniontech.com>  Tue, 24 Sep 2024 16:38:56 +0800
+ -- Matthias Klose <doko@debian.org>  Tue, 25 Nov 2025 03:13:01 +0100
 
-binutils (2.41-6deepin5) unstable; urgency=medium
+binutils (2.45.50.20251023-2) experimental; urgency=medium
 
-  * Backport patches from upstream to LoongArch.
+  * Update libsframe symbols file.
+  * Fix ftbfs on architectures without gprofng.
 
- -- Xin Wang <wangxin03@loongson.cn>  Wed, 27 Nov 2024 17:22:23 +0800
+ -- Matthias Klose <doko@debian.org>  Thu, 23 Oct 2025 17:58:42 +0200
 
-binutils (2.41-6deepin4) unstable; urgency=medium
+binutils (2.45.50.20251023-1) experimental; urgency=medium
 
-  * Enable loong64 cross target for arm64.
+  * New upstream snapshot.
+  * d/p/env-package-metadata.diff: Enforce CLI arg precedence (LP: #2109333)
+    The initial implementation would only give precedence if the CLI arg is
+    not empty. The new implementation now simply loads the default value
+    into the appropriate static variable *before* the argument parsing,
+    where the --package-metadata handler will appropriately clear it.
+  * binutils-dev: Drop the dependency on libsframe-dev.
+  * Split out a libgprofng-dev package.
 
- -- Mingcong Bai <baimingcong@uniontech.com>  Mon, 09 Sep 2024 10:19:28 +0800
+ -- Matthias Klose <doko@debian.org>  Wed, 22 Oct 2025 00:46:05 +0200
 
-binutils (2.41-6deepin3) unstable; urgency=medium
+binutils (2.45.50.20251005-1) experimental; urgency=medium
 
-  * Drop LoongArch backports as they caused Kernel builds to not boot or crash
-    whilst loading certain kernel modules.
-  * This patchset should be revisited on a later date to enable kernel live-
-    patching support.
-  * Drop powerpc64 build target from d/control.
+  * New upstream snapshot.
+  * Refresh patches.
+  * Strip libsframe.a. Addresses: #1114662.
 
- -- Mingcong Bai <baimingcong@uniontech.com>  Tue, 30 Jul 2024 16:48:17 +0800
+ -- Matthias Klose <doko@debian.org>  Sun, 05 Oct 2025 12:47:20 +0200
 
-binutils (2.41-6deepin2) unstable; urgency=medium
+binutils (2.45.50.20250903-1) experimental; urgency=medium
 
-  * Enable full cross compilation set for amd64, arm64, loong64, and riscv64.
-  * Backport fixes for LoongArch from upstream (binutils-2_41-branch, master).
-  * Backport LoongArch -mthin-add-sub support from upstream (for kernel live-
-    patching).
-  * Drop ia64, ppc64 targets.
+  * New upstream snapshot.
 
- -- Mingcong Bai <baimingcong@uniontech.com>  Tue, 18 Jun 2024 10:47:01 +0800
+ -- Matthias Klose <doko@debian.org>  Wed, 03 Sep 2025 12:03:42 +0200
 
-binutils (2.41-6~deepin1) unstable; urgency=medium
+binutils (2.45.50.20250813-1) experimental; urgency=medium
 
-  * Build packages for loong64.
+  * New upstream snapshot.
+  * Bump standards version.
+  * Refresh patches.
 
- -- Chang Yang <yangchang@deepin.org>  Wed, 25 Oct 2023 17:35:02 +0800
+ -- Matthias Klose <doko@debian.org>  Wed, 13 Aug 2025 13:02:06 +0200
 
-binutils (2.41-5~deepin1) unstable; urgency=medium
+binutils (2.45-3) unstable; urgency=medium
 
-  * Drop alpha-linux-gnu.
+  * New upstream snapshot, taken from the 2.45 branch.
+    - Fix unused variable warnings.
+    - Fix PR gas/33229 nds32 gas segfaults on gcc output.
+    - Fix PR binutils/33244, resbin: don't pass NULL as printf %s arg.
+    - LoongArch: Fix symbol size after relaxation.
+  * Update libgprofng symbols file.
+  * Ignore regressions on loong64, m68k, riscv64, s390x, sh4, x32 for now.
+  * Split out a libsframe-dev package.
 
- -- Tianyu Chen <sweetyfish@deepin.org>  Tue, 17 Oct 2023 17:06:07 +0800
+ -- Matthias Klose <doko@debian.org>  Sun, 10 Aug 2025 09:22:44 +0200
 
-binutils (2.41-5) unstable; urgency=medium
+binutils (2.45-1) experimental; urgency=medium
 
-  * Update binutils from the 2.41 branch.
-    - Fix PR gold/30794 (PPC): internal error in add_output_section_to_load.
-    - Fix PR bfd/30724, cygwin ld performance regression.
+  * New upstream release.
+  * Remove gold related patches.
+  * Refresh patches.
 
- -- Matthias Klose <doko@debian.org>  Tue, 05 Sep 2023 15:53:35 +0200
+ -- Matthias Klose <doko@debian.org>  Sun, 27 Jul 2025 17:32:29 +0200
 
-binutils (2.41-4) unstable; urgency=medium
+binutils (2.44.90.20250719-1) experimental; urgency=medium
 
-  * Update binutils from the 2.41 branch.
-    - Fix PR ld/30697, ppc32 mix of local-dynamic and global-dynamic TLS.
+  * New upstream snapshot, taken from the 2.45 branch.
+  * Bump libsframe soname.
+  * Update libsframe symbols file.
+
+ -- Matthias Klose <doko@debian.org>  Sat, 19 Jul 2025 11:25:55 +0200
+
+binutils (2.44.50.20250707-1) experimental; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+  * Ignore the gprofng/synprog test regression.
+
+ -- Matthias Klose <doko@debian.org>  Mon, 07 Jul 2025 08:33:16 +0200
+
+binutils (2.44.50.20250528-1) experimental; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+  * Ignore regressions on loong64, riscv64, s390x, sh4, x32 and hurd-i386;
+    Reported upstream.
+
+ -- Matthias Klose <doko@debian.org>  Wed, 28 May 2025 07:10:39 +0200
+
+binutils (2.44.50.20250520-1) experimental; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+  * Update libgprofng0 symbols file.
+
+ -- Matthias Klose <doko@debian.org>  Tue, 20 May 2025 13:53:19 +0200
+
+binutils (2.44.50.20250502-1) experimental; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+
+ -- Matthias Klose <doko@debian.org>  Fri, 02 May 2025 12:39:32 +0200
+
+binutils (2.44.50.20250405-1) experimental; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+  * Refresh patches.
+
+ -- Matthias Klose <doko@debian.org>  Sat, 05 Apr 2025 13:19:36 +0200
+
+binutils (2.44.50.20250309-1) experimental; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+  * Don't configure --enable-warn-rwx-segments not enabled on hppa, sparc
+    and sparc64. Addresses: #1098970.
+  * Fix cross build for gprofng archs (Helmut Grohne). Addresses: #1098728.
+
+ -- Matthias Klose <doko@debian.org>  Sun, 09 Mar 2025 06:40:30 +0100
+
+binutils (2.44.50.20250218-1) experimental; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+  * Configure with --disable-default-execstack --enable-warn-rwx-segments.
+  * Drop build dependency on binutils-gold.
+
+ -- Matthias Klose <doko@debian.org>  Tue, 18 Feb 2025 12:49:40 +0100
+
+binutils (2.44.50.20250207-1) experimental; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+  * Drop the binutils-gold dependency.
+
+ -- Matthias Klose <doko@debian.org>  Fri, 07 Feb 2025 13:07:54 +0100
+
+binutils (2.44.50.20250201-1) experimental; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+
+ -- Matthias Klose <doko@debian.org>  Sat, 01 Feb 2025 16:36:36 +0100
+
+binutils (2.43.90.20250127-1) unstable; urgency=medium
+
+  * New upstream snapshot, taken from the 2.44 release branch..
+  * Fix build failure on x32.
+  * Fix substitution of @gold_archs@ in targeted cross toolchains (Helmut
+    Grohne). Closes: #1093841.
+  * Fix PR 32599, taken from the trunk. Closes: #1093895.
+
+ -- Matthias Klose <doko@debian.org>  Mon, 27 Jan 2025 11:12:03 +0100
+
+binutils (2.43.90.20250122-2) unstable; urgency=medium
+
+  * Fix binutils-gold dependencies.
+
+ -- Matthias Klose <doko@debian.org>  Thu, 23 Jan 2025 03:37:28 +0100
+
+binutils (2.43.90.20250122-1) unstable; urgency=medium
+
+  * New upstream snapshot, taken from the 2.44 release branch..
+  * Split out gold, as the gold source code removal is planned for the
+    final 2.44 release. For now, binutils depends on binutils-gold.
+  * Build-depend on binutils-gold where available.
+  * Refresh patches.
+  * binutils-doc: Make package more reproducible. Closes: #1092870.
+  * Move gprofng from binutils-<triplet> into binutils, and introduce a
+    binutils-dbg package (Helmut Grohne). Closes: #1093594.
+
+ -- Matthias Klose <doko@debian.org>  Wed, 22 Jan 2025 12:46:27 +0100
+
+binutils (2.43.50.20250108-1) unstable; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+  * Avoid warning in env-package-metadata.diff patch (Nicolas Boulenguez).
+    Closes: #1090761.
+  * binutils-doc: Make package reproducible. Closes: #1090395.
+
+ -- Matthias Klose <doko@debian.org>  Thu, 09 Jan 2025 00:34:21 +0100
+
+binutils (2.43.50.20241230-1) unstable; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+  * Revert the fix for PR gas/32391. Closes: #1090999, #1091488.
+  * Build with GCC 14.2.0-12 on ARM32. Closes: #1091281.
+
+ -- Matthias Klose <doko@debian.org>  Mon, 30 Dec 2024 12:18:11 +0100
+
+binutils (2.43.50.20241221-1) unstable; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+  * Drop the unused infinity-notes patch.
+  * gold: Support percent-encoded JSON in --package-metadata (proposed patch).
+  * Update libgprofng0 symbols file.
+
+ -- Matthias Klose <doko@debian.org>  Sat, 21 Dec 2024 09:58:51 +0100
+
+binutils (2.43.50.20241215-1) unstable; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+  * Increase armhf section alignment to 64k (Ard Biesheuvel). Closes: #1089822.
+
+ -- Matthias Klose <doko@debian.org>  Sun, 15 Dec 2024 11:00:07 +0100
+
+binutils (2.43.50.20241210-1) unstable; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+  * Refresh patches.
+
+ -- Matthias Klose <doko@debian.org>  Tue, 10 Dec 2024 09:55:31 +0100
+
+binutils (2.43.50.20241204-2) unstable; urgency=medium
+
+  * Unset ELF_PACKAGE_METADATA when doing profiled builds and running tests.
+
+ -- Matthias Klose <doko@debian.org>  Wed, 04 Dec 2024 14:17:25 +0100
+
+binutils (2.43.50.20241204-1) unstable; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+  * Disable the pgo build on armel and armhf for now.
+
+ -- Matthias Klose <doko@debian.org>  Wed, 04 Dec 2024 10:13:16 +0100
+
+binutils (2.43.50.20241126-3) unstable; urgency=medium
+
+  * Don't install gprofng examples in multilib and cross packages.
+    Closes: #1088319.
+
+ -- Matthias Klose <doko@debian.org>  Wed, 27 Nov 2024 10:18:02 +0100
+
+binutils (2.43.50.20241126-2) unstable; urgency=medium
+
+  * Work-around PR gprofng/32392.
+
+ -- Matthias Klose <doko@debian.org>  Tue, 26 Nov 2024 16:40:54 +0100
+
+binutils (2.43.50.20241126-1) unstable; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+  * Configure again with --enable-default-hash-style=gnu on mips targets.
+    Closes: #1078819.
+  * Stop building gold on mips targets.
+
+ -- Matthias Klose <doko@debian.org>  Tue, 26 Nov 2024 13:52:50 +0100
+
+binutils (2.43.50.20241112-1) experimental; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+  * Build packages for sparc-linux-gnu (Adrian Glaubitz). Closes: #1086027.
+  * Stop building packages for ia64-linux-gnu. Closes: #1086023.
+
+ -- Matthias Klose <doko@debian.org>  Tue, 12 Nov 2024 17:37:05 +0100
+
+binutils (2.43.50.20241004-1) experimental; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+  * Make the jdk configury dependent on the pkg.binutils.nojava profile.
+
+ -- Matthias Klose <doko@debian.org>  Fri, 04 Oct 2024 08:32:52 +0200
+
+binutils (2.43.50.20240909-1) experimental; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+
+ -- Matthias Klose <doko@debian.org>  Mon, 09 Sep 2024 14:30:23 +0200
+
+binutils (2.43.50.20240822-1) experimental; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+  * Add default-jdk-headless to autopkg test dependencies.
+
+ -- Matthias Klose <doko@debian.org>  Thu, 22 Aug 2024 17:21:00 +0200
+
+binutils (2.43.50.20240817-1) experimental; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+
+ -- Matthias Klose <doko@debian.org>  Sat, 17 Aug 2024 10:50:59 +0200
+
+binutils (2.43.1-5) unstable; urgency=medium
+
+  * Make the jdk configury dependent on the pkg.binutils.nojava profile.
+
+ -- Matthias Klose <doko@debian.org>  Wed, 18 Sep 2024 10:36:17 +0200
+
+binutils (2.43.1-4) unstable; urgency=medium
+
+  * New upstream snapshot, taken from the 2.43 branch.
+    - Fix PR32109, aborting at bfd/bfd.c:1236 in int _bfd_doprnt.
+
+ -- Matthias Klose <doko@debian.org>  Thu, 12 Sep 2024 10:37:43 +0200
+
+binutils (2.43.1-3) unstable; urgency=medium
+
+  * Don't configure --enable-default-hash-style=gnu on mips targets
+    for now. See: #1078819.
+
+ -- Matthias Klose <doko@debian.org>  Sun, 25 Aug 2024 17:32:28 +0200
+
+binutils (2.43.1-2) unstable; urgency=medium
+
+  * New upstream snapshot, taken from the 2.43 branch.
+    - ld: Add an LTO test for common symbol override.
+    - lto: Add a test for PR ld/32083.
+  * Update VCS attributes.
+  * Add default-jdk-headless to autopkg test dependencies.
+
+ -- Matthias Klose <doko@debian.org>  Thu, 22 Aug 2024 16:34:57 +0200
+
+binutils (2.43.1-1) unstable; urgency=medium
+
+  * New upstream release.
+    - LTO: Restore the wrapper symbol check for standard function.
+    - RISC-V: Add support for Zimop extension.
+    - RISC-V: Add support for Zcmop extension.
+    - gas: sparc: Fix faligndatai assembly and disassembly.
+    - PR32067, ld -Wl,--oformat,binary crash in _bfd_elf_link_keep_memory.
+    - ld: Add PR ld/32067 tests.
+    - x86: correct .insn with opcode extension and VEX/XOP/EVEX encoding.
+    - gas: correct .irpc handling with empty string.
+    - lto: Don't include unused LTO archive members in output.
+    - gprofng: fix typo in src/collctrl.cc.
+  * gprofng: Build with jdk support.
+  * Move static gprofng library into the binutils-dev package.
+
+ -- Matthias Klose <doko@debian.org>  Sun, 18 Aug 2024 13:35:14 +0200
+
+binutils (2.43-2) unstable; urgency=medium
+
+  * New upstream snapshot, taken from the 2.43 branch.
+    - LoongArch: Fix DT_RELR and relaxation interaction.
+  * Stop building packages for kfreebsd.
+  * Stop providing i586/i486 symlinks for backports.
+  * ld.bfd, ld.gold: When no package-metadata option is given, fall-back
+    to the envvar ELF_PACKAGE_METADATA.
+
+ -- Matthias Klose <doko@debian.org>  Wed, 07 Aug 2024 07:16:35 +0200
+
+binutils (2.43-1) unstable; urgency=medium
+
+  * New upstream release.
+  * New upstream snapshot, taken from the 2.43 branch.
+    - Fix PR ld/31956, LTO: Restore the wrapper symbol check for
+      standard function.
+  * Refresh patches.
+  * Build-depend on pkgconf instead of pkg-config.
+  * Configure with --enable-default-hash-style=gnu.
+  * Bump standards version.
+
+ -- Matthias Klose <doko@debian.org>  Mon, 05 Aug 2024 06:54:19 +0200
+
+binutils (2.42.90.20240720-2) unstable; urgency=medium
+
+  * Package gprofng on riscv64.
+
+ -- Matthias Klose <doko@debian.org>  Mon, 22 Jul 2024 06:58:53 +0200
+
+binutils (2.42.90.20240720-1) unstable; urgency=medium
+
+  * New upstream snapshot, taken from the 2.43 branch.
+  * Set ELF_PACKAGE_METADATA in the environment.
+  * Update symbols files. Closes: #1064181.
+
+ -- Matthias Klose <doko@debian.org>  Sun, 21 Jul 2024 15:35:10 +0200
+
+binutils (2.42.50.20240710-1) unstable; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+
+ -- Matthias Klose <doko@debian.org>  Wed, 10 Jul 2024 12:55:51 +0200
+
+binutils (2.42.50.20240625-1) unstable; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+
+ -- Matthias Klose <doko@debian.org>  Tue, 25 Jun 2024 14:12:07 +0200
+
+binutils (2.42.50.20240618-1) unstable; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+  * Update the libctf-soname patch for the trunk.
+  * Refresh patches.
+  * Build with -fno-omit-frame-pointer if it's enabled in dpkg-buildflags.
+  * Allow to disable tests using LOCAL_BUILD_OPTIONS.
+
+ -- Matthias Klose <doko@debian.org>  Tue, 18 Jun 2024 14:38:10 +0200
+
+binutils (2.42-5) unstable; urgency=medium
+
+  * No-change rebuild.
+
+ -- Matthias Klose <doko@ubuntu.com>  Fri, 29 Mar 2024 18:55:30 +0100
+
+binutils (2.42-4) unstable; urgency=medium
+
+  * New upstream snapshot, taken from the 2.42 branch.
+    - AArch64: Fix the 2nd operand in gcsstr and gcssttr instructions.
+    - AArch64: Remove B16B16, SVE2p1 and SME2p1.
+  * binutils-dev: Install libopcodes_pic.a and libbfd_pic.a.
+
+ -- Matthias Klose <doko@debian.org>  Tue, 19 Mar 2024 16:08:43 +0100
+
+binutils (2.42-3) unstable; urgency=medium
+
+  * New upstream snapshot, taken from the 2.42 branch.
+    - PR31124: Addendum: Remove PROVIDE of __flmap_init_label, __flmap (AVR).
+    - Mention support for AMD/znver5 in GAS.
+    - x86: Disallow instructions with length > 15 bytes.
+    - LoongArch: gas: Fix the types of symbols referred with %le_*_r
+      in the symtab.
+    - Link x86-64 mark-plt-1.so testcase with --no-as-needed.
+    - PR 31283 windmc: Parse input correctly on big endian hosts.
+    - PR31208, strip can break ELF alignment requirements.
+    - x86/APX: VROUND{P,S}{S,D} encodings require AVX512{F,VL}.
+    - x86-64: Add R_X86_64_CODE_6_GOTTPOFF.
+    - PowerPC: Add support for Power11 options.
+    - x86: Display -msse-check= default as none.
+
+ -- Matthias Klose <doko@debian.org>  Wed, 21 Feb 2024 23:41:40 +0100
+
+binutils (2.42-2) unstable; urgency=medium
+
+  * New upstream snapshot, taken from the 2.42 branch.
+    - Add missing test case files.
+    - Fix PR binutils/31314, chew crashing on use of uninitialized value.
+  * Update bpf target from the trunk:
+    - bpf: there are no ldinddw nor ldabsdw instructions.
+  * Update libgprofng symbols file.
+
+ -- Matthias Klose <doko@debian.org>  Tue, 30 Jan 2024 11:04:12 +0100
+
+binutils (2.42-1) unstable; urgency=medium
+
+  * New upstream release.
+
+ -- Matthias Klose <doko@debian.org>  Mon, 29 Jan 2024 16:42:44 +0100
+
+binutils (2.41.90.20240122-1) unstable; urgency=medium
+
+  * New upstream snapshot, taken from the 2.42 branch.
+  * Update libgprofng symbols file.
+  * Explicitly add i686-linux-gnu for the amd64 binutils.
+
+ -- Matthias Klose <doko@debian.org>  Mon, 22 Jan 2024 16:01:28 +0100
+
+binutils (2.41.90.20240115-1) unstable; urgency=medium
+
+  * New upstream snapshot, taken from the 2.42 branch.
+  * Drop the gold-mips patch. Closes: #1049455.
+  * Enabled gold on amd64-hurd. Closes: #1060419.
+  * Configure hppa binutils with --enable-targets=hppa64-linux-gnu.
+    Closes: #1059674.
+  * Drop nocheck override for powerpc and sparc64. Closes: #1059703.
+  * Configure again with --enable-pgo-build=lto.
+  * Refresh patches.
+
+ -- Matthias Klose <doko@debian.org>  Mon, 15 Jan 2024 16:43:24 +0100
+
+binutils (2.41.50.20231227-1) unstable; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+
+ -- Matthias Klose <doko@debian.org>  Wed, 27 Dec 2023 10:36:14 +0100
+
+binutils (2.41.50.20231214-1) unstable; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+    - Fixes a memory leak. Closes: #1057962.
+
+ -- Matthias Klose <doko@debian.org>  Thu, 14 Dec 2023 17:33:06 +0100
+
+binutils (2.41.50.20231206-1) unstable; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+  * Add more GCC test dependencies for builds on ppc64el and s390x.
+  * Update libgprofng symbols file.
+  * Reset the ignored-regression list.
+
+ -- Matthias Klose <doko@debian.org>  Wed, 06 Dec 2023 08:47:54 +0100
+
+binutils (2.41.50.20231202-1) unstable; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+    - Fix generation of gprofng man pages. Closes: #1042966.
+  * Split out some macros into debian/rules.defs.
+  * Ignore regressions compared to 2.41, See PR ld/31100, PR ld/31101,
+    PR ld/31102.
+
+ -- Matthias Klose <doko@debian.org>  Sat, 02 Dec 2023 11:15:23 +0100
+
+binutils (2.41.50.20231125-1) experimental; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+  * Build cross packages on s390x.
+
+ -- Matthias Klose <doko@debian.org>  Sat, 25 Nov 2023 10:44:41 +0100
+
+binutils (2.41.50.20231101-1) experimental; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+
+ -- Matthias Klose <doko@debian.org>  Wed, 01 Nov 2023 08:19:21 +0100
+
+binutils (2.41.50.20231010-1) experimental; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+  * Build packages for loong64. Addresses: #1034633.
+
+ -- Matthias Klose <doko@debian.org>  Tue, 10 Oct 2023 12:19:36 +0200
+
+binutils (2.41.50.20230905-1) experimental; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
   * Don't create a dangling gold symlink on archs where it's not available.
 
- -- Matthias Klose <doko@debian.org>  Wed, 09 Aug 2023 16:36:52 +0200
+ -- Matthias Klose <doko@debian.org>  Tue, 05 Sep 2023 16:05:21 +0200
 
-binutils (2.41-3) unstable; urgency=medium
+binutils (2.41.50.20230803-1) experimental; urgency=medium
 
-  * Apply proposed patch for PR gprofng/30700.
-  * Also ignore the gprofng.display/display.exp synprog test failure.
-
- -- Matthias Klose <doko@debian.org>  Thu, 03 Aug 2023 06:10:47 +0200
-
-binutils (2.41-2) unstable; urgency=medium
-
-  * Update binutils from the 2.41 branch.
-    - Fix PR gas/28989, rework timestamp preservation on doc/asconfig.texi.
-    - Update translations.
-  * Bump symbols files to final 2.41 version.
-  * Update VCS attributes.
-  * Ignore gprofng and bootstrap test regressions.
-  * gprofng: Fix build with 64bit file offset on 32bit machines, patch taken
-    from the trunk.
+  * New upstream snapshot, taken from the trunk.
   * Build alpha arc hppa m68k sh4 sparc64 cross packages on ppc64el.
+  * Ignore gprofng and bootstrap test regressions.
 
- -- Matthias Klose <doko@debian.org>  Wed, 02 Aug 2023 09:49:46 +0200
+ -- Matthias Klose <doko@debian.org>  Thu, 03 Aug 2023 04:09:45 +0200
+
+binutils (2.41.50.20230731-1) experimental; urgency=medium
+
+  * New upstream snapshot, taken from the trunk.
+  * Bump symbols files to final 2.41 version.
+
+ -- Matthias Klose <doko@debian.org>  Mon, 31 Jul 2023 08:09:39 +0200
 
 binutils (2.41-1) unstable; urgency=medium
 
