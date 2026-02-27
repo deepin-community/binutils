@@ -1,0 +1,14 @@
+--- a/ld/testsuite/ld-elf/sec64k.exp
++++ b/ld/testsuite/ld-elf/sec64k.exp
+@@ -46,6 +46,11 @@ if [istarget "hppa*64*-*-*"] {
+     return
+ }
+ 
++# timing out on sh4, see https://bugs.debian.org/1127604
++if [istarget "sh4-*-*"] {
++    return
++}
++
+ # Test >64k sections, with and without -r.  First, create the assembly
+ # files.  Have a relocation to another section and one within the local
+ # section.
