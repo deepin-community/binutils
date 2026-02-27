@@ -1,3 +1,9 @@
+binutils (2.45.50.20260119-1deepin1) unstable; urgency=medium
+
+  * Enable full cross compilation set for amd64, arm64, loong64, and riscv64.
+
+ -- Chang Yang <yangchang@deepin.org>  Fri, 27 Feb 2026 11:06:22 +0800
+
 binutils (2.45.50.20260119-1) unstable; urgency=medium
 
   * New upstream snapshot.
