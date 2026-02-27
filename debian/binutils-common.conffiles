@@ -1,1 +1,1 @@
-/etc/gprofng.rc
+remove-on-upgrade /etc/gprofng.rc
