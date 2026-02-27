@@ -2,7 +2,7 @@
 
 --- a/gprof/gconfig.in
 +++ b/gprof/gconfig.in
-@@ -99,9 +99,6 @@
+@@ -117,9 +117,6 @@
  #endif
  
  
