@@ -1,3 +1,15 @@
+binutils (2.41-6deepin12) unstable; urgency=medium
+
+  * Fix multiple CVEs
+    - CVE-2025-11082: elf: Don't read beyond .eh_frame section size
+    - CVE-2025-11412: PR 33452 SEGV in bfd_elf_gc_record_vtentry
+    - CVE-2025-11494: x86: Keep _GLOBAL_OFFSET_TABLE_ for .eh_frame
+    - CVE-2025-11495: x86: Disallow TLS relocation in non executable section
+    - CVE-2025-11839: Remove call to abort in DGB debug format printing
+    - CVE-2025-11840: PR 33455 SEGV in vfinfo at ldmisc.c
+
+ -- lichenggang <lichenggang@uniontech.com>  Wed, 22 Apr 2026 18:05:10 +0800
+
 binutils (2.41-6deepin11) unstable; urgency=medium
 
   * LoongArch: common sync from upstream
