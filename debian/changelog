@@ -1,3 +1,15 @@
+binutils (2.41-6deepin12) unstable; urgency=medium
+
+  * Remove cross-compiler g++ packages from build dependencies
+    - Remove g++-aarch64-linux-gnu, g++-arm-linux-gnueabi,
+      g++-arm-linux-gnueabihf, g++-powerpc64le-linux-gnu,
+      g++-s390x-linux-gnu, g++-hppa-linux-gnu, g++-m68k-linux-gnu,
+      g++-powerpc-linux-gnu, g++-riscv64-linux-gnu, g++-sh4-linux-gnu,
+      g++-sparc64-linux-gnu, g++-i686-linux-gnu, g++-x86-64-linux-gnu,
+      g++-x86-64-linux-gnux32
+
+ -- lichenggang <lichenggang@uniontech.com>  Thu, 23 Apr 2026 22:21:09 +0800
+
 binutils (2.41-6deepin11) unstable; urgency=medium
 
   * LoongArch: common sync from upstream
