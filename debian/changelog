@@ -1,3 +1,11 @@
+binutils (2.41-6deepin13) unstable; urgency=medium
+
+  *   * Security fixes:   * CVE-2025-11412: Patch from src-
+    openeuler/binutils   * CVE-2026-3441: Patch from src-
+    openeuler/binutils
+
+ -- deepin-ci-robot <packages@deepin.org>  Thu, 28 May 2026 21:13:29 +0800
+
 binutils (2.41-6deepin12) unstable; urgency=medium
 
   * Remove cross-compiler g++ packages from build dependencies
