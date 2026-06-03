@@ -1,3 +1,12 @@
+binutils (2.41-6deepin13) unstable; urgency=medium
+
+  * fix CVE-2025-11082: heap buffer overflow in parse_gnu_debuglink
+  * fix CVE-2025-11083: out-of-bounds memory access
+  * fix CVE-2025-11412: segfault in bfd_close
+  * fix CVE-2025-11414: null pointer dereference in bfd
+
+ -- hudeng <hudeng@deepin.org>  Wed, 03 Jun 2026 17:30:00 +0800
+
 binutils (2.41-6deepin12) unstable; urgency=medium
 
   * Remove cross-compiler g++ packages from build dependencies
