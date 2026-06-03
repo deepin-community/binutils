@@ -204,3 +204,7 @@ CVE-2025-8225.patch
 0016-LoongArch-Fix-incorrect-display-of-FDEs-address-rang.patch
 0017-LoongArch-Use-more-appropriate-assertions-for-the-re.patch
 0018-LoongArch-set-PRSTATUS_SIZE-0x1e0-to-match-kernel-s-.patch
+CVE-2025-11082.patch
+CVE-2025-11083.patch
+CVE-2025-11412.patch
+CVE-2025-11414.patch
