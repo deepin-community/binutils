@@ -195,12 +195,12 @@ CVE-2025-8225.patch
 0007-loongarch-gas-resolving-constant-expressions.patch
 0008-ubsan-undefined-shift-in-loongarch_elf_add_sub_reloc.patch
 0009-loongarch-gcc-4.5-build-fixes.patch
-0010-LoongArch-Batch-delete-bytes-at-the-end-of-each-rela.patch
-0011-LoongArch-Allow-to-relax-instructions-into-NOPs-afte.patch
-0012-LoongArch-Fix-errors-due-to-version-differences.patch
-0013-LoongArch-fix-relaxation-overflowing.patch
-0014-LoongArch-Un-skip-cross-segment-alignment-compensati.patch
-0015-LoongArch-Fix-symbol-size-after-relaxation.patch
+# DISABLED: 0010-LoongArch-Batch-delete-bytes-at-the-end-of-each-rela.patch  (causes PLT entry loss, see glibc build failure)
+# DISABLED: 0011-LoongArch-Allow-to-relax-instructions-into-NOPs-afte.patch  (causes PLT entry loss, see glibc build failure)
+# DISABLED: 0012-LoongArch-Fix-errors-due-to-version-differences.patch  (causes PLT entry loss, see glibc build failure)
+# DISABLED: 0013-LoongArch-fix-relaxation-overflowing.patch  (causes PLT entry loss, see glibc build failure)
+# DISABLED: 0014-LoongArch-Un-skip-cross-segment-alignment-compensati.patch  (causes PLT entry loss, see glibc build failure)
+# DISABLED: 0015-LoongArch-Fix-symbol-size-after-relaxation.patch  (causes PLT entry loss, see glibc build failure)
 0016-LoongArch-Fix-incorrect-display-of-FDEs-address-rang.patch
-0017-LoongArch-Use-more-appropriate-assertions-for-the-re.patch
+# DISABLED: 0017-LoongArch-Use-more-appropriate-assertions-for-the-re.patch  (causes PLT entry loss, see glibc build failure)
 0018-LoongArch-set-PRSTATUS_SIZE-0x1e0-to-match-kernel-s-.patch

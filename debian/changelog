@@ -1,3 +1,20 @@
+binutils (2.41-6deepin13) unstable; urgency=medium
+
+  * Disable LoongArch relaxation refactoring patches (0010-0015, 0017)
+    - These patches refactor the linker relaxation from 2-pass to 3-pass
+      with batch byte deletion (splay tree) and NOP substitution
+    - The refactored relaxation causes PLT entries to be lost for
+      R_LARCH_CALL36 relocations in shared libraries, breaking:
+      * check-localplt (missing malloc/realloc/calloc/free PLT refs)
+      * lazy binding (dlopen fails with "undefined symbol" errors)
+      * TLS descriptor tests (segfaults in tst-tls20)
+    - Combined with gcc-12 12.3.0-17deepin17 switching default code model
+      to medium (emitting R_LARCH_CALL36 instead of R_LARCH_PCALA_HI20),
+      this causes glibc 2.38-6deepin27 build failures on loong64
+    - Reverting to the proven 2-pass relaxation from 2.41-6deepin9
+
+ -- lichenggang <lichenggang@uniontech.com>  Thu, 23 Jul 2026 13:22:33 +0800
+
 binutils (2.41-6deepin12) unstable; urgency=medium
 
   * Remove cross-compiler g++ packages from build dependencies
