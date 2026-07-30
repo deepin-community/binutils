@@ -35,3 +35,8 @@ armhf-64k-alignment.diff
 gprofng-examples-tgz-deterministic.diff
 gprofng-cross-build.diff
 sh-disable-tests.diff
+
+# SpacemiT RISC-V vendor extensions
+# https://sourceware.org/pipermail/binutils/2026-May/149417.html
+riscv-xsmtvdot.patch
+riscv-xsmtvdotii.patch

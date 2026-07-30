@@ -1,3 +1,9 @@
+binutils (2.46-2deepin2) unstable; urgency=medium
+
+  * RISC-V: Add SpacemiT vendor extension xsmtvdotii
+
+ -- Chang Yang <yangchang@deepin.org>  Thu, 30 Jul 2026 21:42:02 +0800
+
 binutils (2.46-2deepin1) unstable; urgency=medium
 
   * Enable full cross compilation set for amd64, arm64, loong64, and riscv64.

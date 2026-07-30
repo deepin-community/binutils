@@ -1,0 +1,593 @@
+From: Mark Zhuang <mark.zhuang@spacemit.com>
+
+SpacemiT defines Intrinsic Matrix Extension (IME) specification [1].
+SpacemiT X60 implements version 1.0 of the SpacemiT Vector Dot Product
+Extension (XsmtVdot v1.0) [2], a subset of the full IME specification.
+
+[1] https://github.com/spacemit-com/riscv-ime-extension-spec/releases/download/v1.0/spacemit-ime-asciidoc.pdf
+[2] https://github.com/spacemit-com/docs-ai/blob/main/en/architecture/ime_extension.md
+---
+ bfd/elfxx-riscv.c                         |  7 ++
+ gas/NEWS                                  |  3 +
+ gas/config/tc-riscv.c                     | 81 +++++++++++++++++++++++
+ gas/doc/c-riscv.texi                      |  8 +++
+ gas/testsuite/gas/riscv/march-help.l      |  1 +
+ gas/testsuite/gas/riscv/x-smt-vdot-fail.d |  3 +
+ gas/testsuite/gas/riscv/x-smt-vdot-fail.l | 73 ++++++++++++++++++++
+ gas/testsuite/gas/riscv/x-smt-vdot-fail.s | 50 ++++++++++++++
+ gas/testsuite/gas/riscv/x-smt-vdot.d      | 41 ++++++++++++
+ gas/testsuite/gas/riscv/x-smt-vdot.s      | 33 +++++++++
+ include/opcode/riscv-opc.h                | 38 +++++++++++
+ include/opcode/riscv.h                    |  9 +++
+ opcodes/riscv-dis.c                       | 33 +++++++++
+ opcodes/riscv-opc.c                       | 23 +++++++
+ 14 files changed, 403 insertions(+)
+ create mode 100644 gas/testsuite/gas/riscv/x-smt-vdot-fail.d
+ create mode 100644 gas/testsuite/gas/riscv/x-smt-vdot-fail.l
+ create mode 100644 gas/testsuite/gas/riscv/x-smt-vdot-fail.s
+ create mode 100644 gas/testsuite/gas/riscv/x-smt-vdot.d
+ create mode 100644 gas/testsuite/gas/riscv/x-smt-vdot.s
+
+diff --git a/bfd/elfxx-riscv.c b/bfd/elfxx-riscv.c
+index 83134f81c96..5fdbc1698af 100644
+--- a/bfd/elfxx-riscv.c
++++ b/bfd/elfxx-riscv.c
+@@ -1229,6 +1229,8 @@ static const struct riscv_implicit_subset riscv_implicit_subsets[] =
+   {"xtheadvector", "+zicsr", check_implicit_always},
+   {"xtheadzvamo", "+zaamo", check_implicit_always},
+ 
++  {"xsmtvdot", "+zve32x", check_implicit_always},
++
+   {"v", "+zve64d,+zvl128b", check_implicit_always},
+   {"zvfh", "+zvfhmin,+zfhmin", check_implicit_always},
+   {"zvfhmin", "+zve32f", check_implicit_always},
+@@ -1644,6 +1646,7 @@ static const struct riscv_supported_ext riscv_supported_vendor_x_ext[] =
+   {"xmipscmov",		ISA_SPEC_CLASS_DRAFT,	1, 0, 0 },
+   {"xmipsexectl",	ISA_SPEC_CLASS_DRAFT,	1, 0, 0 },
+   {"xmipslsp",		ISA_SPEC_CLASS_DRAFT,	1, 0, 0 },
++  {"xsmtvdot",		ISA_SPEC_CLASS_DRAFT,	1, 0, 0 },
+   {NULL, 0, 0, 0, 0}
+ };
+ 
+@@ -3062,6 +3065,8 @@ riscv_multi_subset_supports (riscv_parse_subset_t *rps,
+       return riscv_subset_supports (rps, "xmipsexectl");
+     case INSN_CLASS_XMIPSLSP:
+       return riscv_subset_supports (rps, "xmipslsp");
++    case INSN_CLASS_XSMTVDOT:
++      return riscv_subset_supports (rps, "xsmtvdot");
+     default:
+       rps->error_handler
+         (_("internal: unreachable INSN_CLASS_*"));
+@@ -3365,6 +3370,8 @@ riscv_multi_subset_supports_ext (riscv_parse_subset_t *rps,
+       return "xsfvqmaccdod";
+     case INSN_CLASS_XSFVFNRCLIPXFQF:
+       return "xsfvfnrclipxfqf";
++    case INSN_CLASS_XSMTVDOT:
++      return "xsmtvdot";
+     default:
+       rps->error_handler
+         (_("internal: unreachable INSN_CLASS_*"));
+diff --git a/gas/NEWS b/gas/NEWS
+index e384d1135c0..e47d55b05dc 100644
+--- a/gas/NEWS
++++ b/gas/NEWS
+@@ -1,5 +1,8 @@
+ -*- text -*-
+ 
++* Add support for RISC-V vendor extensions:
++  SpacemiT: xsmtvdot v1.0.
++
+ Changes in 2.46:
+ 
+ * Add support for AMD Zen6 processor.
+diff --git a/gas/config/tc-riscv.c b/gas/config/tc-riscv.c
+index b00b530b0bd..9c062ad3521 100644
+--- a/gas/config/tc-riscv.c
++++ b/gas/config/tc-riscv.c
+@@ -1770,6 +1770,30 @@ validate_riscv_insn (const struct riscv_opcode *opc, int length)
+ 		    goto unknown_validate_operand;
+ 		}
+ 		break;
++	    case 'p': /* Vendor-specific (SpacemiT) operands.  */
++	      switch (*++oparg)
++		{
++		case 'V':
++		  switch (*++oparg)
++		    {
++		    case 'd':
++		      USE_BITS (OP_MASK_SPACEMIT_IME_VD, OP_SH_SPACEMIT_IME_VD);
++		      break;
++		    case 's':
++		      USE_BITS (OP_MASK_SPACEMIT_IME_VS1,
++				OP_SH_SPACEMIT_IME_VS1);
++		      break;
++		    default:
++		      goto unknown_validate_operand;
++		    }
++		  break;
++		case 'w':
++		  USE_BITS (OP_MASK_SPACEMIT_IME_WI, OP_SH_SPACEMIT_IME_WI);
++		  break;
++		default:
++		  goto unknown_validate_operand;
++		}
++	      break;
+ 	    default:
+ 	      goto unknown_validate_operand;
+ 	    }
+@@ -4286,6 +4310,63 @@ riscv_ip (char *str, struct riscv_cl_insn *ip, expressionS *imm_expr,
+ 		    }
+ 		  break;
+ 
++		case 'p': /* Vendor-specific (SpacemiT) operands.  */
++		  switch (*++oparg)
++		    {
++		    case 'V':
++		      switch (*++oparg)
++			{
++			case 'd':
++			  if (!reg_lookup (&asarg, RCLASS_VECR, &regno))
++			    break;
++			  if ((regno & 0x1) != 0)
++			    {
++			      error.msg
++				= _("illegal operands (vd must be even)");
++			      error.missing_ext = NULL;
++			      goto out;
++			    }
++			  INSERT_OPERAND (SPACEMIT_IME_VD, *ip, regno>>1);
++			  continue;
++			case 's':
++			  if (!reg_lookup (&asarg, RCLASS_VECR, &regno))
++			    break;
++			  if ((regno & 0x1) != 0)
++			    {
++			      error.msg
++				= _("illegal operands (vs1 must be even)");
++			      error.missing_ext = NULL;
++			      goto out;
++			    }
++			  INSERT_OPERAND (SPACEMIT_IME_VS1, *ip, regno>>1);
++			  continue;
++			default:
++			  goto unknown_riscv_ip_operand;
++			}
++		      break;
++		    case 'w':
++		      /* Xpw: optional data-width suffix, i8 only (WI=3).
++			 If omitted, defaults to i8.  */
++		      if (*asarg == ',')
++			{
++			  if (strcmp (asarg + 1, "i8") != 0)
++			    {
++			      error.msg
++				= _("illegal operands (invalid data type)");
++			      error.missing_ext = NULL;
++			      goto out;
++			    }
++			  asarg += 3;
++			}
++		      else if (*asarg != '\0')
++			goto unknown_riscv_ip_operand;
++		      regno = 3;
++		      INSERT_OPERAND (SPACEMIT_IME_WI, *ip, regno);
++		      continue;
++		    default:
++		      goto unknown_riscv_ip_operand;
++		    }
++		  break;
+ 		default:
+ 		  goto unknown_riscv_ip_operand;
+ 		}
+diff --git a/gas/doc/c-riscv.texi b/gas/doc/c-riscv.texi
+index c6c4081c204..d28744f4547 100644
+--- a/gas/doc/c-riscv.texi
++++ b/gas/doc/c-riscv.texi
+@@ -918,4 +918,12 @@ The XMipsSlsp extension provides instructions mips.ldp, mips.lwp, mips.sdp and m
+ 
+ It is documented in @url{https://mips.com/wp-content/uploads/2025/03/P8700-F_Programmers_Reference_Manual_Rev1.82_3-19-2025.pdf}.
+ 
++@item XSmtVdot
++The XSmtVdot extension provides instructions for vector dot.
++
++SpacemiT defines Intrinsic Matrix Extension (IME) specification,
++documented in @url{https://github.com/spacemit-com/riscv-ime-extension-spec/releases/download/v1.0/spacemit-ime-asciidoc.pdf}.
++SpacemiT X60 implements version 1.0 of the SpacemiT Vector Dot Product Extension (XsmtVdot v1.0), a subset of the full IME specification,
++documented in @url{https://github.com/spacemit-com/docs-ai/blob/main/en/architecture/ime_extension.md}.
++
+ @end table
+diff --git a/gas/testsuite/gas/riscv/march-help.l b/gas/testsuite/gas/riscv/march-help.l
+index 0ce2f896735..6e52669e9a4 100644
+--- a/gas/testsuite/gas/riscv/march-help.l
++++ b/gas/testsuite/gas/riscv/march-help.l
+@@ -186,3 +186,4 @@ All available -march extensions for RISC-V:
+ 	xmipscmov                               1.0
+ 	xmipsexectl                             1.0
+ 	xmipslsp                                1.0
++	xsmtvdot                                1.0
+diff --git a/gas/testsuite/gas/riscv/x-smt-vdot-fail.d b/gas/testsuite/gas/riscv/x-smt-vdot-fail.d
+new file mode 100644
+index 00000000000..bf8fb0f87ac
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/x-smt-vdot-fail.d
+@@ -0,0 +1,3 @@
++#as: -march=rv64gcv_xsmtvdot -I$srcdir/$subdir/
++#source: x-smt-vdot-fail.s
++#error_output: x-smt-vdot-fail.l
+diff --git a/gas/testsuite/gas/riscv/x-smt-vdot-fail.l b/gas/testsuite/gas/riscv/x-smt-vdot-fail.l
+new file mode 100644
+index 00000000000..77511d45296
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/x-smt-vdot-fail.l
+@@ -0,0 +1,73 @@
++.*: Assembler messages:
++.*:3: Error: illegal operands \(vd must be even\) `smt.vmadot v1,v3,v4'
++.*:4: Error: illegal operands \(vd must be even\) `smt.vmadotu v1,v3,v4'
++.*:5: Error: illegal operands \(vd must be even\) `smt.vmadotsu v1,v3,v4'
++.*:6: Error: illegal operands \(vd must be even\) `smt.vmadotus v1,v3,v4'
++.*:7: Error: illegal operands \(vd must be even\) `smt.vmadot1u v1,v4,v5'
++.*:8: Error: illegal operands \(vd must be even\) `smt.vmadot1 v1,v4,v5'
++.*:9: Error: illegal operands \(vd must be even\) `smt.vmadot1su v1,v4,v5'
++.*:10: Error: illegal operands \(vd must be even\) `smt.vmadot1us v1,v4,v5'
++.*:11: Error: illegal operands \(vd must be even\) `smt.vmadot2u v1,v4,v5'
++.*:12: Error: illegal operands \(vd must be even\) `smt.vmadot2 v1,v4,v5'
++.*:13: Error: illegal operands \(vd must be even\) `smt.vmadot2su v1,v4,v5'
++.*:14: Error: illegal operands \(vd must be even\) `smt.vmadot2us v1,v4,v5'
++.*:15: Error: illegal operands \(vd must be even\) `smt.vmadot3u v1,v4,v5'
++.*:16: Error: illegal operands \(vd must be even\) `smt.vmadot3 v1,v4,v5'
++.*:17: Error: illegal operands \(vd must be even\) `smt.vmadot3su v1,v4,v5'
++.*:18: Error: illegal operands \(vd must be even\) `smt.vmadot3us v1,v4,v5'
++.*:20: Error: illegal operands \(vs1 must be even\) `smt.vmadot1u v2,v3,v5'
++.*:21: Error: illegal operands \(vs1 must be even\) `smt.vmadot1 v2,v3,v5'
++.*:22: Error: illegal operands \(vs1 must be even\) `smt.vmadot1su v2,v3,v5'
++.*:23: Error: illegal operands \(vs1 must be even\) `smt.vmadot1us v2,v3,v5'
++.*:24: Error: illegal operands \(vs1 must be even\) `smt.vmadot2u v2,v3,v5'
++.*:25: Error: illegal operands \(vs1 must be even\) `smt.vmadot2 v2,v3,v5'
++.*:26: Error: illegal operands \(vs1 must be even\) `smt.vmadot2su v2,v3,v5'
++.*:27: Error: illegal operands \(vs1 must be even\) `smt.vmadot2us v2,v3,v5'
++.*:28: Error: illegal operands \(vs1 must be even\) `smt.vmadot3u v2,v3,v5'
++.*:29: Error: illegal operands \(vs1 must be even\) `smt.vmadot3 v2,v3,v5'
++.*:30: Error: illegal operands \(vs1 must be even\) `smt.vmadot3su v2,v3,v5'
++.*:31: Error: illegal operands \(vs1 must be even\) `smt.vmadot3us v2,v3,v5'
++.*:33: Error: illegal operands \(invalid data type\) `smt.vmadot v2,v3,v4,i1'
++.*:34: Error: illegal operands \(invalid data type\) `smt.vmadot v2,v3,v4,i2'
++.*:35: Error: illegal operands \(invalid data type\) `smt.vmadot v2,v3,v4,i3'
++.*:36: Error: illegal operands \(invalid data type\) `smt.vmadot v2,v3,v4,i4'
++.*:37: Error: illegal operands \(invalid data type\) `smt.vmadot v2,v3,v4,i5'
++.*:38: Error: illegal operands \(invalid data type\) `smt.vmadot v2,v3,v4,i7'
++.*:39: Error: illegal operands \(invalid data type\) `smt.vmadot v2,v3,v4,i16'
++.*:40: Error: illegal operands \(invalid data type\) `smt.vmadot v2,v3,v4,i32'
++.*:41: Error: illegal operands \(invalid data type\) `smt.vmadot v2,v3,v4,i64'
++.*:42: Error: illegal operands \(invalid data type\) `smt.vmadot1u v2,v4,v5,i2'
++.*:43: Error: illegal operands \(invalid data type\) `smt.vmadot2u v2,v4,v5,i4'
++.*:44: Error: illegal operands \(invalid data type\) `smt.vmadot3u v2,v4,v5,i16'
++.*:2: Error: unrecognized opcode `smt.vmadot v2,v3,v4', extension `xsmtvdot' required
++.*:3: Error: unrecognized opcode `smt.vmadotu v2,v3,v4', extension `xsmtvdot' required
++.*:4: Error: unrecognized opcode `smt.vmadotsu v2,v3,v4', extension `xsmtvdot' required
++.*:5: Error: unrecognized opcode `smt.vmadotus v2,v3,v4', extension `xsmtvdot' required
++.*:6: Error: unrecognized opcode `smt.vmadot1u v2,v4,v5', extension `xsmtvdot' required
++.*:7: Error: unrecognized opcode `smt.vmadot1 v2,v4,v5', extension `xsmtvdot' required
++.*:8: Error: unrecognized opcode `smt.vmadot1su v2,v4,v5', extension `xsmtvdot' required
++.*:9: Error: unrecognized opcode `smt.vmadot1us v2,v4,v5', extension `xsmtvdot' required
++.*:10: Error: unrecognized opcode `smt.vmadot2u v2,v4,v5', extension `xsmtvdot' required
++.*:11: Error: unrecognized opcode `smt.vmadot2 v2,v4,v5', extension `xsmtvdot' required
++.*:12: Error: unrecognized opcode `smt.vmadot2su v2,v4,v5', extension `xsmtvdot' required
++.*:13: Error: unrecognized opcode `smt.vmadot2us v2,v4,v5', extension `xsmtvdot' required
++.*:14: Error: unrecognized opcode `smt.vmadot3u v2,v4,v5', extension `xsmtvdot' required
++.*:15: Error: unrecognized opcode `smt.vmadot3 v2,v4,v5', extension `xsmtvdot' required
++.*:16: Error: unrecognized opcode `smt.vmadot3su v2,v4,v5', extension `xsmtvdot' required
++.*:17: Error: unrecognized opcode `smt.vmadot3us v2,v4,v5', extension `xsmtvdot' required
++.*:18: Error: unrecognized opcode `smt.vmadot v2,v3,v4,i8', extension `xsmtvdot' required
++.*:19: Error: unrecognized opcode `smt.vmadotu v2,v3,v4,i8', extension `xsmtvdot' required
++.*:20: Error: unrecognized opcode `smt.vmadotsu v2,v3,v4,i8', extension `xsmtvdot' required
++.*:21: Error: unrecognized opcode `smt.vmadotus v2,v3,v4,i8', extension `xsmtvdot' required
++.*:22: Error: unrecognized opcode `smt.vmadot1u v2,v4,v5,i8', extension `xsmtvdot' required
++.*:23: Error: unrecognized opcode `smt.vmadot1 v2,v4,v5,i8', extension `xsmtvdot' required
++.*:24: Error: unrecognized opcode `smt.vmadot1su v2,v4,v5,i8', extension `xsmtvdot' required
++.*:25: Error: unrecognized opcode `smt.vmadot1us v2,v4,v5,i8', extension `xsmtvdot' required
++.*:26: Error: unrecognized opcode `smt.vmadot2u v2,v4,v5,i8', extension `xsmtvdot' required
++.*:27: Error: unrecognized opcode `smt.vmadot2 v2,v4,v5,i8', extension `xsmtvdot' required
++.*:28: Error: unrecognized opcode `smt.vmadot2su v2,v4,v5,i8', extension `xsmtvdot' required
++.*:29: Error: unrecognized opcode `smt.vmadot2us v2,v4,v5,i8', extension `xsmtvdot' required
++.*:30: Error: unrecognized opcode `smt.vmadot3u v2,v4,v5,i8', extension `xsmtvdot' required
++.*:31: Error: unrecognized opcode `smt.vmadot3 v2,v4,v5,i8', extension `xsmtvdot' required
++.*:32: Error: unrecognized opcode `smt.vmadot3su v2,v4,v5,i8', extension `xsmtvdot' required
++.*:33: Error: unrecognized opcode `smt.vmadot3us v2,v4,v5,i8', extension `xsmtvdot' required
+diff --git a/gas/testsuite/gas/riscv/x-smt-vdot-fail.s b/gas/testsuite/gas/riscv/x-smt-vdot-fail.s
+new file mode 100644
+index 00000000000..af33b693e54
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/x-smt-vdot-fail.s
+@@ -0,0 +1,50 @@
++target:
++	# vmadot/vmadot1/2/3: vd must be even
++	smt.vmadot v1, v3, v4
++	smt.vmadotu v1, v3, v4
++	smt.vmadotsu v1, v3, v4
++	smt.vmadotus v1, v3, v4
++	smt.vmadot1u v1, v4, v5
++	smt.vmadot1 v1, v4, v5
++	smt.vmadot1su v1, v4, v5
++	smt.vmadot1us v1, v4, v5
++	smt.vmadot2u v1, v4, v5
++	smt.vmadot2 v1, v4, v5
++	smt.vmadot2su v1, v4, v5
++	smt.vmadot2us v1, v4, v5
++	smt.vmadot3u v1, v4, v5
++	smt.vmadot3 v1, v4, v5
++	smt.vmadot3su v1, v4, v5
++	smt.vmadot3us v1, v4, v5
++	# vmadot1/2/3: vs1 must be even
++	smt.vmadot1u v2, v3, v5
++	smt.vmadot1 v2, v3, v5
++	smt.vmadot1su v2, v3, v5
++	smt.vmadot1us v2, v3, v5
++	smt.vmadot2u v2, v3, v5
++	smt.vmadot2 v2, v3, v5
++	smt.vmadot2su v2, v3, v5
++	smt.vmadot2us v2, v3, v5
++	smt.vmadot3u v2, v3, v5
++	smt.vmadot3 v2, v3, v5
++	smt.vmadot3su v2, v3, v5
++	smt.vmadot3us v2, v3, v5
++	# vmadot/vmadot1/2/3: invalid data type
++	smt.vmadot v2, v3, v4, i1
++	smt.vmadot v2, v3, v4, i2
++	smt.vmadot v2, v3, v4, i3
++	smt.vmadot v2, v3, v4, i4
++	smt.vmadot v2, v3, v4, i5
++	smt.vmadot v2, v3, v4, i7
++	smt.vmadot v2, v3, v4, i16
++	smt.vmadot v2, v3, v4, i32
++	smt.vmadot v2, v3, v4, i64
++	smt.vmadot1u v2, v4, v5, i2
++	smt.vmadot2u v2, v4, v5, i4
++	smt.vmadot3u v2, v4, v5, i16
++
++	# xsmtvdot - extension required
++	.option push
++	.option arch, rv64gcv
++	.include "x-smt-vdot.s"
++	.option pop
+diff --git a/gas/testsuite/gas/riscv/x-smt-vdot.d b/gas/testsuite/gas/riscv/x-smt-vdot.d
+new file mode 100644
+index 00000000000..6f86236785d
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/x-smt-vdot.d
+@@ -0,0 +1,41 @@
++#as: -march=rv64gcv_xsmtvdot
++#objdump: -dr
++
++.*:[ 	]+file format .*
++
++
++Disassembly of section .text:
++
++0+000 <target>:
++[ 	]+[0-9a-f]+:[ 	]+e241b12b[ 	]+smt.vmadot[ 	]+v2,v3,v4
++[ 	]+[0-9a-f]+:[ 	]+e241812b[ 	]+smt.vmadotu[ 	]+v2,v3,v4
++[ 	]+[0-9a-f]+:[ 	]+e241a12b[ 	]+smt.vmadotsu[ 	]+v2,v3,v4
++[ 	]+[0-9a-f]+:[ 	]+e241912b[ 	]+smt.vmadotus[ 	]+v2,v3,v4
++[ 	]+[0-9a-f]+:[ 	]+e652012b[ 	]+smt.vmadot1u[ 	]+v2,v4,v5
++[ 	]+[0-9a-f]+:[ 	]+e652312b[ 	]+smt.vmadot1[ 	]+v2,v4,v5
++[ 	]+[0-9a-f]+:[ 	]+e652212b[ 	]+smt.vmadot1su[ 	]+v2,v4,v5
++[ 	]+[0-9a-f]+:[ 	]+e652112b[ 	]+smt.vmadot1us[ 	]+v2,v4,v5
++[ 	]+[0-9a-f]+:[ 	]+e652412b[ 	]+smt.vmadot2u[ 	]+v2,v4,v5
++[ 	]+[0-9a-f]+:[ 	]+e652712b[ 	]+smt.vmadot2[ 	]+v2,v4,v5
++[ 	]+[0-9a-f]+:[ 	]+e652612b[ 	]+smt.vmadot2su[ 	]+v2,v4,v5
++[ 	]+[0-9a-f]+:[ 	]+e652512b[ 	]+smt.vmadot2us[ 	]+v2,v4,v5
++[ 	]+[0-9a-f]+:[ 	]+e652812b[ 	]+smt.vmadot3u[ 	]+v2,v4,v5
++[ 	]+[0-9a-f]+:[ 	]+e652b12b[ 	]+smt.vmadot3[ 	]+v2,v4,v5
++[ 	]+[0-9a-f]+:[ 	]+e652a12b[ 	]+smt.vmadot3su[ 	]+v2,v4,v5
++[ 	]+[0-9a-f]+:[ 	]+e652912b[ 	]+smt.vmadot3us[ 	]+v2,v4,v5
++[ 	]+[0-9a-f]+:[ 	]+e241b12b[ 	]+smt.vmadot[ 	]+v2,v3,v4
++[ 	]+[0-9a-f]+:[ 	]+e241812b[ 	]+smt.vmadotu[ 	]+v2,v3,v4
++[ 	]+[0-9a-f]+:[ 	]+e241a12b[ 	]+smt.vmadotsu[ 	]+v2,v3,v4
++[ 	]+[0-9a-f]+:[ 	]+e241912b[ 	]+smt.vmadotus[ 	]+v2,v3,v4
++[ 	]+[0-9a-f]+:[ 	]+e652012b[ 	]+smt.vmadot1u[ 	]+v2,v4,v5
++[ 	]+[0-9a-f]+:[ 	]+e652312b[ 	]+smt.vmadot1[ 	]+v2,v4,v5
++[ 	]+[0-9a-f]+:[ 	]+e652212b[ 	]+smt.vmadot1su[ 	]+v2,v4,v5
++[ 	]+[0-9a-f]+:[ 	]+e652112b[ 	]+smt.vmadot1us[ 	]+v2,v4,v5
++[ 	]+[0-9a-f]+:[ 	]+e652412b[ 	]+smt.vmadot2u[ 	]+v2,v4,v5
++[ 	]+[0-9a-f]+:[ 	]+e652712b[ 	]+smt.vmadot2[ 	]+v2,v4,v5
++[ 	]+[0-9a-f]+:[ 	]+e652612b[ 	]+smt.vmadot2su[ 	]+v2,v4,v5
++[ 	]+[0-9a-f]+:[ 	]+e652512b[ 	]+smt.vmadot2us[ 	]+v2,v4,v5
++[ 	]+[0-9a-f]+:[ 	]+e652812b[ 	]+smt.vmadot3u[ 	]+v2,v4,v5
++[ 	]+[0-9a-f]+:[ 	]+e652b12b[ 	]+smt.vmadot3[ 	]+v2,v4,v5
++[ 	]+[0-9a-f]+:[ 	]+e652a12b[ 	]+smt.vmadot3su[ 	]+v2,v4,v5
++[ 	]+[0-9a-f]+:[ 	]+e652912b[ 	]+smt.vmadot3us[ 	]+v2,v4,v5
+diff --git a/gas/testsuite/gas/riscv/x-smt-vdot.s b/gas/testsuite/gas/riscv/x-smt-vdot.s
+new file mode 100644
+index 00000000000..a9991de4fc3
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/x-smt-vdot.s
+@@ -0,0 +1,33 @@
++target:
++	smt.vmadot v2, v3, v4
++	smt.vmadotu v2, v3, v4
++	smt.vmadotsu v2, v3, v4
++	smt.vmadotus v2, v3, v4
++	smt.vmadot1u v2, v4, v5
++	smt.vmadot1 v2, v4, v5
++	smt.vmadot1su v2, v4, v5
++	smt.vmadot1us v2, v4, v5
++	smt.vmadot2u v2, v4, v5
++	smt.vmadot2 v2, v4, v5
++	smt.vmadot2su v2, v4, v5
++	smt.vmadot2us v2, v4, v5
++	smt.vmadot3u v2, v4, v5
++	smt.vmadot3 v2, v4, v5
++	smt.vmadot3su v2, v4, v5
++	smt.vmadot3us v2, v4, v5
++	smt.vmadot v2, v3, v4, i8
++	smt.vmadotu v2, v3, v4, i8
++	smt.vmadotsu v2, v3, v4, i8
++	smt.vmadotus v2, v3, v4, i8
++	smt.vmadot1u v2, v4, v5, i8
++	smt.vmadot1 v2, v4, v5, i8
++	smt.vmadot1su v2, v4, v5, i8
++	smt.vmadot1us v2, v4, v5, i8
++	smt.vmadot2u v2, v4, v5, i8
++	smt.vmadot2 v2, v4, v5, i8
++	smt.vmadot2su v2, v4, v5, i8
++	smt.vmadot2us v2, v4, v5, i8
++	smt.vmadot3u v2, v4, v5, i8
++	smt.vmadot3 v2, v4, v5, i8
++	smt.vmadot3su v2, v4, v5, i8
++	smt.vmadot3us v2, v4, v5, i8
+diff --git a/include/opcode/riscv-opc.h b/include/opcode/riscv-opc.h
+index 6f2775c6152..31b7e7a06a7 100644
+--- a/include/opcode/riscv-opc.h
++++ b/include/opcode/riscv-opc.h
+@@ -3852,6 +3852,44 @@
+ #define MASK_MIPS_PAUSE  0xffffffff
+ #define MATCH_MIPS_PREF 0x0000000b
+ #define MASK_MIPS_PREF 0xe000707f
++/* SpacemiT custom instruction.  */
++/* Int Matrix Multiplicative Accumulation.  */
++#define MATCH_SMT_VMADOT   0x8200302b
++#define MASK_SMT_VMADOT    0x9e0070ff
++#define MATCH_SMT_VMADOTU  0x8200002b
++#define MASK_SMT_VMADOTU   0x9e0070ff
++#define MATCH_SMT_VMADOTSU 0x8200202b
++#define MASK_SMT_VMADOTSU  0x9e0070ff
++#define MATCH_SMT_VMADOTUS 0x8200102b
++#define MASK_SMT_VMADOTUS  0x9e0070ff
++/* Int Sliding Window Multiplicative Accumulation.  */
++/* Sliding Value = 1.  */
++#define MATCH_SMT_VMADOT1U 0x8600002b
++#define MASK_SMT_VMADOT1U  0x9e00f0ff
++#define MATCH_SMT_VMADOT1  0x8600302b
++#define MASK_SMT_VMADOT1   0x9e00f0ff
++#define MATCH_SMT_VMADOT1SU 0x8600202b
++#define MASK_SMT_VMADOT1SU 0x9e00f0ff
++#define MATCH_SMT_VMADOT1US 0x8600102b
++#define MASK_SMT_VMADOT1US 0x9e00f0ff
++/* Sliding Value = 2.  */
++#define MATCH_SMT_VMADOT2U 0x8600402b
++#define MASK_SMT_VMADOT2U 0x9e00f0ff
++#define MATCH_SMT_VMADOT2 0x8600702b
++#define MASK_SMT_VMADOT2 0x9e00f0ff
++#define MATCH_SMT_VMADOT2SU 0x8600602b
++#define MASK_SMT_VMADOT2SU 0x9e00f0ff
++#define MATCH_SMT_VMADOT2US 0x8600502b
++#define MASK_SMT_VMADOT2US 0x9e00f0ff
++/* Sliding Value = 3.  */
++#define MATCH_SMT_VMADOT3U 0x8600802b
++#define MASK_SMT_VMADOT3U 0x9e00f0ff
++#define MATCH_SMT_VMADOT3 0x8600b02b
++#define MASK_SMT_VMADOT3 0x9e00f0ff
++#define MATCH_SMT_VMADOT3SU 0x8600a02b
++#define MASK_SMT_VMADOT3SU 0x9e00f0ff
++#define MATCH_SMT_VMADOT3US 0x8600902b
++#define MASK_SMT_VMADOT3US 0x9e00f0ff
+ /* Unprivileged Counter/Timers CSR addresses.  */
+ #define CSR_CYCLE 0xc00
+ #define CSR_TIME 0xc01
+diff --git a/include/opcode/riscv.h b/include/opcode/riscv.h
+index de105f5df8b..3a32abfcf3c 100644
+--- a/include/opcode/riscv.h
++++ b/include/opcode/riscv.h
+@@ -419,6 +419,14 @@ static inline unsigned int riscv_insn_length (insn_t insn)
+ #define OP_MASK_MIPS_SDP_OFFSET25   0x3
+ #define OP_SH_MIPS_SDP_OFFSET25     25
+ 
++/* SpacemiT fields.  */
++#define OP_MASK_SPACEMIT_IME_VD		0xf
++#define OP_SH_SPACEMIT_IME_VD		8
++#define OP_MASK_SPACEMIT_IME_VS1	0xf
++#define OP_SH_SPACEMIT_IME_VS1		16
++#define OP_MASK_SPACEMIT_IME_WI		0x3
++#define OP_SH_SPACEMIT_IME_WI		29
++
+ /* ABI names for selected x-registers.  */
+ 
+ #define X_ZERO 0
+@@ -606,6 +614,7 @@ enum riscv_insn_class
+   INSN_CLASS_XMIPSCMOV,
+   INSN_CLASS_XMIPSEXECTL,
+   INSN_CLASS_XMIPSLSP,
++  INSN_CLASS_XSMTVDOT,
+ };
+ 
+ /* This structure holds information for a particular instruction.  */
+diff --git a/opcodes/riscv-dis.c b/opcodes/riscv-dis.c
+index eda802ff420..93d41343772 100644
+--- a/opcodes/riscv-dis.c
++++ b/opcodes/riscv-dis.c
+@@ -917,6 +917,39 @@ print_insn_args (const char *oparg, insn_t l, bfd_vma pc, disassemble_info *info
+ 		  goto undefined_modifier;
+ 		}
+ 	      break;
++	    case 'p': /* Vendor-specific (SpacemiT) operands.  */
++	      switch (*++oparg)
++		{
++		case 'V':
++		  switch (*++oparg)
++		    {
++		    case 'd':
++		      unsigned vd = EXTRACT_OPERAND (SPACEMIT_IME_VD, l) * 2;
++		      print (info->stream, dis_style_register, "%s",
++			     riscv_vecr_names_numeric[vd]);
++		      break;
++		    case 's':
++		      unsigned vs = EXTRACT_OPERAND (SPACEMIT_IME_VS1, l) * 2;
++		      print (info->stream, dis_style_register, "%s",
++			     riscv_vecr_names_numeric[vs]);
++		      break;
++		    default:
++		      goto undefined_modifier;
++		    }
++		  break;
++		case 'w':
++		  /* Xpw: optional data-width suffix, i8 only.  WI==3 (i8)
++		     is the default and is omitted from the output.  */
++		  {
++		    unsigned wi = EXTRACT_OPERAND (SPACEMIT_IME_WI, l);
++		    if (wi != 3)
++		      goto undefined_modifier;
++		  }
++		  break;
++		default:
++		  goto undefined_modifier;
++		}
++	      break;
+ 	    default:
+ 	      goto undefined_modifier;
+ 	    }
+diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
+index 54887c97880..417918bb6f6 100644
+--- a/opcodes/riscv-opc.c
++++ b/opcodes/riscv-opc.c
+@@ -3579,6 +3579,29 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"mips.sdp", 0, INSN_CLASS_XMIPSLSP, "t,r,Xm^(s)", MATCH_MIPS_SDP, MASK_MIPS_SDP, match_opcode, 0 },
+ {"mips.swp", 0, INSN_CLASS_XMIPSLSP, "t,r,Xm&(s)", MATCH_MIPS_SWP, MASK_MIPS_SWP, match_opcode, 0 },
+ 
++/* SpacemiT custom instructions.  */
++/* Int Matrix Multi-Accumulation.  */
++{"smt.vmadot",   0, INSN_CLASS_XSMTVDOT, "XpVd,Vs,VtXpw", MATCH_SMT_VMADOT, MASK_SMT_VMADOT, match_opcode, 0 },
++{"smt.vmadotu",  0, INSN_CLASS_XSMTVDOT, "XpVd,Vs,VtXpw", MATCH_SMT_VMADOTU, MASK_SMT_VMADOTU, match_opcode, 0 },
++{"smt.vmadotsu", 0, INSN_CLASS_XSMTVDOT, "XpVd,Vs,VtXpw", MATCH_SMT_VMADOTSU, MASK_SMT_VMADOTSU, match_opcode, 0 },
++{"smt.vmadotus", 0, INSN_CLASS_XSMTVDOT, "XpVd,Vs,VtXpw", MATCH_SMT_VMADOTUS, MASK_SMT_VMADOTUS, match_opcode, 0 },
++/* Int Sliding Window Multi-Accumulation.  */
++/* Sliding Value = 1.  */
++{"smt.vmadot1u",  0, INSN_CLASS_XSMTVDOT, "XpVd,XpVs,VtXpw", MATCH_SMT_VMADOT1U, MASK_SMT_VMADOT1U, match_opcode, 0 },
++{"smt.vmadot1",   0, INSN_CLASS_XSMTVDOT, "XpVd,XpVs,VtXpw", MATCH_SMT_VMADOT1, MASK_SMT_VMADOT1, match_opcode, 0 },
++{"smt.vmadot1su", 0, INSN_CLASS_XSMTVDOT, "XpVd,XpVs,VtXpw", MATCH_SMT_VMADOT1SU, MASK_SMT_VMADOT1SU, match_opcode, 0 },
++{"smt.vmadot1us", 0, INSN_CLASS_XSMTVDOT, "XpVd,XpVs,VtXpw", MATCH_SMT_VMADOT1US, MASK_SMT_VMADOT1US, match_opcode, 0 },
++/* Sliding Value = 2.  */
++{"smt.vmadot2u",  0, INSN_CLASS_XSMTVDOT, "XpVd,XpVs,VtXpw", MATCH_SMT_VMADOT2U, MASK_SMT_VMADOT2U, match_opcode, 0 },
++{"smt.vmadot2",   0, INSN_CLASS_XSMTVDOT, "XpVd,XpVs,VtXpw", MATCH_SMT_VMADOT2, MASK_SMT_VMADOT2, match_opcode, 0 },
++{"smt.vmadot2su", 0, INSN_CLASS_XSMTVDOT, "XpVd,XpVs,VtXpw", MATCH_SMT_VMADOT2SU, MASK_SMT_VMADOT2SU, match_opcode, 0 },
++{"smt.vmadot2us", 0, INSN_CLASS_XSMTVDOT, "XpVd,XpVs,VtXpw", MATCH_SMT_VMADOT2US, MASK_SMT_VMADOT2US, match_opcode, 0 },
++/* Sliding Value = 3.  */
++{"smt.vmadot3u",  0, INSN_CLASS_XSMTVDOT, "XpVd,XpVs,VtXpw", MATCH_SMT_VMADOT3U, MASK_SMT_VMADOT3U, match_opcode, 0 },
++{"smt.vmadot3",   0, INSN_CLASS_XSMTVDOT, "XpVd,XpVs,VtXpw", MATCH_SMT_VMADOT3, MASK_SMT_VMADOT3, match_opcode, 0 },
++{"smt.vmadot3su", 0, INSN_CLASS_XSMTVDOT, "XpVd,XpVs,VtXpw", MATCH_SMT_VMADOT3SU, MASK_SMT_VMADOT3SU, match_opcode, 0 },
++{"smt.vmadot3us", 0, INSN_CLASS_XSMTVDOT, "XpVd,XpVs,VtXpw", MATCH_SMT_VMADOT3US, MASK_SMT_VMADOT3US, match_opcode, 0 },
++
+ /* Terminate the list.  */
+ {0, 0, INSN_CLASS_NONE, 0, 0, 0, 0, 0}
+ };
+-- 
+2.34.1
