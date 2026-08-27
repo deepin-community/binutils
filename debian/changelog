@@ -1,3 +1,9 @@
+binutils (2.41-6deepin14) unstable; urgency=medium
+
+  * fix(cve): CVE-2025-69649
+
+ -- deepin-ci-robot <packages@deepin.org>  Thu, 27 Aug 2026 10:21:53 +0800
+
 binutils (2.41-6deepin12) unstable; urgency=medium
 
   * Remove cross-compiler g++ packages from build dependencies
