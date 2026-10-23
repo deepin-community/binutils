@@ -295,8 +295,8 @@ ifneq (,$(filter $(DEB_HOST_ARCH), $(gold_targets)))
   gold_provides = -Vgold:Provides=binutils-gold
 endif
 
-CFLAGS = -g -O2 -ffile-prefix-map=$(CURDIR)=.
-CXXFLAGS = -g -O2 -ffile-prefix-map=$(CURDIR)=.
+CFLAGS = -g -O2 -ffile-prefix-map=$(CURDIR)=. -frandom-seed=deepin-binutils
+CXXFLAGS = -g -O2 -ffile-prefix-map=$(CURDIR)=. -frandom-seed=deepin-binutils
 LDFLAGS =
 CROSS := $(DEB_HOST_GNU_TYPE)-
 CC     = $(CROSS)gcc
@@ -1862,6 +1862,16 @@ ifeq ($(with_check),yes)
 	  sed -i -e '/Test run by/d' $(d_dev)/$(PF)/share/doc/$(p_bin)/tests/$$b.sum; \
 	  xz -9v $(d_dev)/$(PF)/share/doc/$(p_bin)/tests/$$b.sum; \
 	  $(install_file) $${i%.sum}.log $(d_dev)/$(PF)/share/doc/$(p_bin)/tests/$$b.log; \
+	  sed -i -e '/Test run by/d' \
+	    -e 's/^runtest completed at .*/runtest completed at TIMESTAMP/' \
+	    -e 's/completed in [0-9]\+ seconds\{0,1\}/completed in N seconds/g' \
+	    -e 's/[Pp]rocess [Ii][Dd]\(: \)\{0,1\}[0-9]\{2,\}/Process ID: N/g' \
+	    -e 's/\bcompiler[0-9]\{2,\}\b/compilerN/g' \
+	    -e 's/\(tmpdir\/[a-zA-Z_]\{1,\}\)[0-9]\{2,\}/\1N/g' \
+	    -e 's/\bempty[0-9]\{2,\}\./emptyN./g' \
+	    -e 's/[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}T[0-9:.]\{1,\}\(+[0-9:]\{1,\}\)\{0,1\}/TIMESTAMP/g' \
+	    $(d_dev)/$(PF)/share/doc/$(p_bin)/tests/$$b.log; \
+	  LC_ALL=C sort -o $(d_dev)/$(PF)/share/doc/$(p_bin)/tests/$$b.log $(d_dev)/$(PF)/share/doc/$(p_bin)/tests/$$b.log; \
 	  xz -9v $(d_dev)/$(PF)/share/doc/$(p_bin)/tests/$$b.log; \
 	done
 endif
