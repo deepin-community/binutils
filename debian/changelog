@@ -1,3 +1,20 @@
+binutils (2.41-6deepin16) unstable; urgency=medium
+
+  * fix(build): make the PGO+LTO build reproducible
+    - Add -frandom-seed=deepin-binutils to CFLAGS/CXXFLAGS: GCC's default
+      LTO random seed is generated per compilation and is not derived
+      from SOURCE_DATE_EPOCH, so every rebuild produced different
+      .gnu.lto_* section names and LTO bytecode; this made
+      libgp-collectorAPI.a differ (26 LTO section names, 350 bytes) and
+      shifted ~190 functions in ld.bfd (ldelf_parse_ld_so_conf
+      728->729 bytes), breaking binutils / binutils-x86-64-linux-gnu /
+      -dbg reproducibility
+    - Normalize the test logs shipped in binutils-dev (timestamps, PIDs,
+      temp file names, durations, line ordering) like the existing .sum
+      normalization, so binutils-dev rebuilds are identical
+
+ -- lichenggang <lichenggang@uniontech.com>  Sat, 24 Oct 2026 00:05:48 +0800
+
 binutils (2.41-6deepin15) unstable; urgency=medium
 
   * fix(cve): CVE-2026-6846
