@@ -1,3 +1,38 @@
+binutils (2.41-6deepin17) unstable; urgency=medium
+
+  * fix(build): make the shipped binutils-dev test logs reproducible
+    - Backport upstream binutils-gdb 71320db6509e ("binutils/testsuite:
+      don't tail the same input and output file").  The -Wi test ran
+      "tail -n +4 objdump.out" while dejagnu's local_exec was already
+      redirecting the command's output onto that same file, so the
+      reader could find it truncated.  "file size" was then 0, the test
+      reported UNTESTED and its early "return" skipped the rest of
+      objdump.exp.  The two debrebuild runs at
+      cdimage.uniontech.com/storage-professional/uos-debrebuild-snipe/
+      20261028_135304/binutils/ lost and won that race respectively:
+      298 expected passes plus 1 untested test versus 311 expected
+      passes, which also shifted binutils.sum and test-summary-amd64
+      and grew the shipped binutils.log.xz from 37 KB to 49 KB
+    - Extend the test-log normalization in debian/rules so the tokens
+      that still vary between runs are neutralized: the CR bytes that
+      dejagnu.h test programs write, which make the "\tPASSED:"/PASS:
+      interleaving racy; the result markers that end up mid-line
+      because of that interleaving (care is taken not to split
+      XFAIL:/XPASS:); the pid-suffixed temporary files of the ld
+      testsuite (cs, ifunc, lto, lto_shared, dl_avail_test, gnu2_tls,
+      ctf_available); the /tmp/ccXXXXXX.ltrans objects left by the PGO
+      link steps; and the plugin API trace addresses (LDPT_* func@0x...).
+      Blank lines left by the marker split are dropped so the LC_ALL=C
+      sort output is stable
+    - The only difference left in ld.log is the section header offset
+      that ld-new prints for itself (3650616 vs 3650664, 48 bytes).  That
+      is the PGO+LTO code generation variance which 2.41-6deepin16
+      addresses with -frandom-seed, so it should disappear once that entry
+      is built; it is called out here because the logs in this run come
+      from 2.41-6deepin15
+
+ -- lichenggang <lichenggang@uniontech.com>  Thu, 29 Oct 2026 16:29:11 +0800
+
 binutils (2.41-6deepin16) unstable; urgency=medium
 
   * fix(build): make the PGO+LTO build reproducible

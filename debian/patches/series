@@ -206,3 +206,4 @@ CVE-2025-8225.patch
 0018-LoongArch-set-PRSTATUS_SIZE-0x1e0-to-match-kernel-s-.patch
 CVE-2025-69649.patch
 CVE-2026-6846.patch
+0019-binutils-testsuite-dont-tail-the-same-input-and-outpu.patch
