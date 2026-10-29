@@ -1,0 +1,44 @@
+Description: binutils/testsuite: don't tail the same input and output file
+ dejagnu's local_exec opens the output file for writing before the child
+ command runs.  When the command reads and writes the very same file
+ ("tail -n +4 objdump.out" redirected into objdump.out), the reader can
+ see a file that has already been truncated, so the tail output is lost.
+ The -Wi test then fails its "file size" check, reports UNTESTED instead
+ of PASS and returns early, skipping every later test in objdump.exp.
+ Which side of the race wins differs between two builds of identical
+ source, so the test logs shipped in binutils-dev (and the test-summary
+ used by the regression check) are not reproducible.
+ .
+ Write the tail output to a separate file instead, as upstream did in
+ binutils-gdb commit 71320db6509e.  That commit targets a newer testsuite
+ where the temporary file already lives in tmpdir/; here the 2.41 testsuite
+ still uses objdump.out in the current directory, so only the output name
+ is changed.
+Author: Clément Chigot <chigot@adacore.com>
+Origin: https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;h=71320db6509e0893607e9343b5af56a8c130a2ed
+Last-Update: 2026-10-29
+---
+diff --git a/binutils/testsuite/binutils-all/objdump.exp b/binutils/testsuite/binutils-all/objdump.exp
+index 28a7ad67..9315a068 100644
+--- a/binutils/testsuite/binutils-all/objdump.exp
++++ b/binutils/testsuite/binutils-all/objdump.exp
+@@ -560,8 +560,8 @@ if { ![is_elf_format] } then {
+        send_log "\n"
+     }
+ 
+-    set got [remote_exec host "tail -n +4 objdump.out" "" "/dev/null" "objdump.out"]
+-    set output [remote_upload host objdump.out]
++    set got [remote_exec host "tail -n +4 objdump.out" "" "/dev/null" "objdump.tail"]
++    set output [remote_upload host objdump.tail]
+ 
+     if ![file size $output] then {
+        # If the output file is empty, then this target does not
+@@ -571,7 +571,7 @@ if { ![is_elf_format] } then {
+        return
+     }
+ 
+-    if { [regexp_diff objdump.out $srcdir/$subdir/dw5-op.W] } then {
++    if { [regexp_diff objdump.tail $srcdir/$subdir/dw5-op.W] } then {
+        fail "objdump -Wi for DW_OP_*"
+     } else {
+        pass "objdump -Wi for DW_OP_*"
