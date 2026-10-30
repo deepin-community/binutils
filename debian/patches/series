@@ -207,3 +207,4 @@ CVE-2025-8225.patch
 CVE-2025-69649.patch
 CVE-2026-6846.patch
 0019-binutils-testsuite-dont-tail-the-same-input-and-outpu.patch
+0020-pgo-drop-host-dependent-ldelf-profile.patch

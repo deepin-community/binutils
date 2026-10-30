@@ -1,3 +1,31 @@
+binutils (2.41-6deepin18) unstable; urgency=medium
+
+  * fix(build): stop the linker from using the training profile of ldelf.c
+    - The two 2.41-6deepin17 builds compared in
+      cdimage.uniontech.com/storage-professional/uos-debrebuild-snipe/
+      20261029_215922/binutils/ still differ, and only in
+      binutils-x86-64-linux-gnu_2.41-6deepin17_amd64.deb, only in
+      usr/bin/x86_64-linux-gnu-ld.bfd.  The file keeps its size, but
+      ldelf_parse_ld_so_conf grows from 728 to 729 bytes and its .cold part
+      from 317 to 320, which moves 190 later symbols and changes .text,
+      .rodata, .eh_frame, .rela.dyn, .data and .note.gnu.build-id (and the
+      "Start of section headers" line of the ld.log shipped in binutils-dev)
+    - That is a -fprofile-use cold block layout decision, and ld/ldelf.c is
+      the only translation unit in ld whose counters are not derived from
+      test input shipped in the source package: while training it parses
+      /etc/ld.so.conf and every file this includes, so its profile also
+      depends on the build host.  Measured locally: the same profile gives
+      byte identical ld builds, replacing only ld/ldelf.gcda gives a
+      different one, and the ASLR dependent value profile payloads that do
+      differ between two training runs do not change the output at all
+    - Compile ldelf.c from static heuristics instead, so this function no
+      longer follows a profile input that the source package does not fully
+      determine.  The other ld translation units keep their profile
+    - The remaining gas.log difference in binutils-dev (a dejagnu PASS
+      marker that the test output interleaves with) is not addressed here
+
+ -- lichenggang <lichenggang@uniontech.com>  Fri, 30 Oct 2026 11:00:37 +0800
+
 binutils (2.41-6deepin17) unstable; urgency=medium
 
   * fix(build): make the shipped binutils-dev test logs reproducible

@@ -1,0 +1,48 @@
+Description: PGO: do not use the training profile of ld/ldelf.c
+ --enable-pgo-build=lto trains the freshly built ld by running the ld
+ testsuite with -fprofile-generate and rebuilds it with -fprofile-use.
+ ld/ldelf.c is the only translation unit of ld whose counters are not
+ derived from test input shipped in the source package: whenever a
+ DT_NEEDED entry cannot be resolved, ldelf_parse_ld_so_conf parses
+ /etc/ld.so.conf and every file this includes, so its profile also depends
+ on the build host.  That is where the two 20261029_215922 debrebuild runs
+ differ: ldelf_parse_ld_so_conf grows from 728 to 729 bytes and its .cold
+ part from 317 to 320, which moves 190 later symbols and changes .text,
+ .rodata, .eh_frame, .rela.dyn, .data and .note.gnu.build-id.
+ .
+ Verified on a local build with the same flags: the same profile gives byte
+ identical binaries, replacing only ld/ldelf.gcda gives a different one,
+ and the ASLR dependent value profile payloads that do differ between two
+ identical training runs do not change the output at all.
+ .
+ ld/ldelf.gcda is dropped between the training run and the -fprofile-use
+ rebuild, so this translation unit is optimized from static heuristics like
+ untrained code and its layout no longer follows a profile input that the
+ source package does not fully determine.
+Author: lichenggang <lichenggang@uniontech.com>
+Last-Update: 2026-10-30
+---
+diff --git a/Makefile.in b/Makefile.in
+index 38f1f9ab..65bbdd7c 100644
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -1168,6 +1168,7 @@ all:
+ 		$(PGO_BUILD_TRAINING_MFLAGS) \
+ 		$(PGO_BUILD_TRAINING_FLAGS_TO_PASS) \
+ 		$(PGO_BUILD_TRAINING) \
++	&& rm -f ld/ldelf.gcda \
+ 	&& $(MAKE) $(RECURSE_FLAGS_TO_PASS) clean \
+ 	&& $(MAKE) $(RECURSE_FLAGS_TO_PASS) \
+ 		$(PGO_BUILD_USE_FLAGS_TO_PASS) all-host all-target \
+diff --git a/Makefile.tpl b/Makefile.tpl
+index 88db8f44..72a1ef20 100644
+--- a/Makefile.tpl
++++ b/Makefile.tpl
+@@ -851,6 +851,7 @@ all:
+ 		$(PGO_BUILD_TRAINING_MFLAGS) \
+ 		$(PGO_BUILD_TRAINING_FLAGS_TO_PASS) \
+ 		$(PGO_BUILD_TRAINING) \
++	&& rm -f ld/ldelf.gcda \
+ 	&& $(MAKE) $(RECURSE_FLAGS_TO_PASS) clean \
+ 	&& $(MAKE) $(RECURSE_FLAGS_TO_PASS) \
+ 		$(PGO_BUILD_USE_FLAGS_TO_PASS) all-host all-target \
